@@ -153,12 +153,12 @@ let appState = {
 };
 
 // Date constants
-const START_DATE_STR = "2025-06-13";
-const END_DATE_STR = "2025-09-01";
-const INDIA_START_STR = "2025-06-24";
-const INDIA_END_STR = "2025-07-08";
-const INFO_START_STR = "2025-06-22";
-const INFO_END_STR = "2025-08-21";
+const START_DATE_STR = "2026-06-13";
+const END_DATE_STR = "2026-09-01";
+const INDIA_START_STR = "2026-06-24";
+const INDIA_END_STR = "2026-07-08";
+const INFO_START_STR = "2026-06-22";
+const INFO_END_STR = "2026-08-21";
 
 // 5. HELPER DATE FUNCTIONS
 function parseDate(dateStr) {
@@ -451,7 +451,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
           // Cannot schedule PortSwigger after India trip starts.
           // In baseline generation, it is forced to fit before June 24.
           // During rollovers, if it cascades past June 24, we push it to July 9 (after India trip).
-          if (day.date < "2025-07-09") {
+          if (day.date < "2026-07-09") {
             break; // Skip scheduling PortSwigger during India trip, try next days
           }
         }
@@ -459,14 +459,14 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
       
       if (task.category === "secplus") {
         // Security+ starts after India trip (July 9)
-        if (day.date < "2025-07-09") {
+        if (day.date < "2026-07-09") {
           break; // Cannot schedule Sec+ before July 9. Move to next day.
         }
       }
 
       if (task.category === "projects") {
         // Projects start after Security+ exam (target August 22/23)
-        if (day.date < "2025-08-22") {
+        if (day.date < "2026-08-22") {
           break; // Cannot schedule projects before Sec+ finishes
         }
       }
@@ -866,7 +866,7 @@ function reflowRemainingCurriculum() {
 
 // 9. LOCAL STORAGE PERSISTENCE
 function saveState() {
-  localStorage.setItem("cyber_study_plan_state", JSON.stringify(appState));
+  localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
   // Also sync to Firebase cloud if user is signed in
   if (typeof saveStateToFirestore === "function" && currentUser) {
     saveStateToFirestore();
@@ -874,7 +874,7 @@ function saveState() {
 }
 
 function loadState() {
-  const saved = localStorage.getItem("cyber_study_plan_state");
+  const saved = localStorage.getItem("cyber_study_plan_state_2026");
   if (saved) {
     try {
       appState = JSON.parse(saved);
@@ -897,7 +897,7 @@ function generateNewState() {
 }
 
 function resetPlannerState() {
-  localStorage.removeItem("cyber_study_plan_state");
+  localStorage.removeItem("cyber_study_plan_state_2026");
   appState.settings = {
     maxNormalDailyHours: 8,
     palanaEnabled: true,
@@ -1003,7 +1003,7 @@ function spawnSparkles(e) {
 }
 
 // 11. UI RENDERING & COMPONENT BUILDERS
-let activeMonth = "2025-06"; // Current calendar viewing month
+let activeMonth = "2026-06"; // Current calendar viewing month
 let selectedDate = null;     // Date open in side drawer
 
 function initUI() {
@@ -1090,10 +1090,10 @@ function renderDashboardMetrics() {
   document.getElementById("metric-completion-fill").style.width = `${compPercent}%`;
   document.getElementById("metric-completion-sub").innerText = `${completedTasks} / ${totalTasks} Tasks Completed`;
   
-  // Countdown to Sept 1, 2025
-  // Note: Today's date is simulated. Since this is a 2025 study plan, let's treat the date as active.
+  // Countdown to Sept 1, 2026
+  // Note: Today's date is simulated. Since this is a 2026 study plan, let's treat the date as active.
   // If we are currently in 2026 (local time), the study plan has completed, but let's mock the "current" study date.
-  // Let's assume the simulated current date is the first day of the plan June 13, 2025 or the last rolled-over day.
+  // Let's assume the simulated current date is the first day of the plan June 13, 2026 or the last rolled-over day.
   let simulatedToday = parseDate(START_DATE_STR);
   if (appState.settings.lastRolloverDay) {
     simulatedToday = parseDate(appState.settings.lastRolloverDay);
@@ -1206,10 +1206,10 @@ function renderCalendarMonthControls() {
   container.innerHTML = "";
   
   const months = [
-    { code: "2025-06", label: "JUNE 2025" },
-    { code: "2025-07", label: "JULY 2025" },
-    { code: "2025-08", label: "AUGUST 2025" },
-    { code: "2025-09", label: "SEPT 2025" }
+    { code: "2026-06", label: "JUNE 2026" },
+    { code: "2026-07", label: "JULY 2026" },
+    { code: "2026-08", label: "AUGUST 2026" },
+    { code: "2026-09", label: "SEPT 2026" }
   ];
   
   months.forEach(m => {
@@ -1232,7 +1232,7 @@ function renderCalendarDays() {
   container.innerHTML = "";
   
   // Calculate padding days for start of month
-  // E.g., June 2025 starts on a Friday
+  // E.g., June 2026 starts on a Friday
   const activeYear = parseInt(activeMonth.split('-')[0]);
   const activeMonthIndex = parseInt(activeMonth.split('-')[1]) - 1;
   

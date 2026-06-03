@@ -67,7 +67,7 @@ async function loadStateFromFirestore() {
       if (cloudState && cloudState.days && cloudState.days.length > 0) {
         appState = cloudState;
         // Also write to localStorage as local backup
-        localStorage.setItem("cyber_study_plan_state", JSON.stringify(appState));
+        localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
       } else {
         // Cloud state is empty/corrupt — use local or generate fresh
         if (!appState.days || appState.days.length === 0) {
