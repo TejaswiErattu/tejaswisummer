@@ -1,11 +1,11 @@
 // =============================================================
-// PASTE YOUR FIREBASE CONFIG HERE (Step 4 of setup instructions)
+// Firebase project: tejaswisummer
 // =============================================================
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY",
-  authDomain: "PASTE_YOUR_AUTH_DOMAIN",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_STORAGE_BUCKET",
-  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
-  appId: "PASTE_YOUR_APP_ID"
+  apiKey: "AIzaSyANrZ-idU70jwzjI5hGT2nil_ZNQEhmI_Y",
+  authDomain: "tejaswisummer.firebaseapp.com",
+  projectId: "tejaswisummer",
+  storageBucket: "tejaswisummer.firebasestorage.app",
+  messagingSenderId: "812309857243",
+  appId: "1:812309857243:web:9d70a1acd1f09b18ffddfe"
 };
