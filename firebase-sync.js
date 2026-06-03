@@ -12,8 +12,15 @@ let isSyncing = false;
 function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(err => {
-    console.error("Sign-in error:", err);
-    showAuthToast("Sign-in failed. Try again.", "error");
+    console.error("Sign-in error:", err.code, err.message);
+    if (err.code === "auth/unauthorized-domain") {
+      showAuthToast("❌ Domain not authorized in Firebase. See setup instructions.", "error");
+      alert('Firebase setup needed!\n\n1. Go to: https://console.firebase.google.com/project/tejaswisummer/authentication/settings\n2. Scroll to "Authorized domains"\n3. Click "Add domain"\n4. Add: tejaswierattu.github.io\n5. Click Save — then try again!');
+    } else if (err.code === "auth/popup-blocked") {
+      showAuthToast("❌ Popup blocked — please allow popups for this site.", "error");
+    } else {
+      showAuthToast(`❌ Sign-in failed: ${err.code}`, "error");
+    }
   });
 }
 
