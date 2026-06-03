@@ -867,6 +867,10 @@ function reflowRemainingCurriculum() {
 // 9. LOCAL STORAGE PERSISTENCE
 function saveState() {
   localStorage.setItem("cyber_study_plan_state", JSON.stringify(appState));
+  // Also sync to Firebase cloud if user is signed in
+  if (typeof saveStateToFirestore === "function" && currentUser) {
+    saveStateToFirestore();
+  }
 }
 
 function loadState() {
@@ -1627,5 +1631,13 @@ document.addEventListener("DOMContentLoaded", () => {
       resetPlannerState();
       closeSettings();
     }
+  });
+
+  // 7. Firebase auth buttons
+  document.getElementById("auth-signin-btn").addEventListener("click", () => {
+    if (typeof signInWithGoogle === "function") signInWithGoogle();
+  });
+  document.getElementById("auth-signout-btn").addEventListener("click", () => {
+    if (typeof signOutFirebase === "function") signOutFirebase();
   });
 });

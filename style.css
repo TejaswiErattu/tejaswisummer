@@ -1540,3 +1540,135 @@ input:checked + .slider:before {
     font-size: 0.6rem;
   }
 }
+
+/* ── FIREBASE AUTH BAR ─────────────────────────────────────── */
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 1.5rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.3s;
+  gap: 1rem;
+}
+
+.auth-unsigned {
+  background: rgba(255, 60, 60, 0.07);
+}
+
+.auth-signed {
+  background: rgba(0, 255, 136, 0.06);
+}
+
+.auth-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--neon-green);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.auth-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--neon-green);
+  object-fit: cover;
+}
+
+.auth-user-info {
+  font-size: 0.72rem;
+  color: var(--neon-green);
+  opacity: 0.9;
+}
+
+.auth-signin-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: var(--text-primary);
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.auth-signin-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.auth-signout-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  color: rgba(255, 100, 100, 0.8);
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  transition: background 0.2s;
+}
+
+.auth-signout-btn:hover {
+  background: rgba(255, 100, 100, 0.1);
+}
+
+/* ── AUTH TOAST NOTIFICATION ───────────────────────────────── */
+.auth-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.auth-toast-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.auth-toast-success {
+  background: rgba(0, 255, 136, 0.15);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+  color: var(--neon-green);
+}
+
+.auth-toast-info {
+  background: rgba(0, 212, 255, 0.12);
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  color: var(--neon-cyan);
+}
+
+.auth-toast-error {
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  color: #ff6060;
+}
+
