@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Study Tracker // Command Center</title>
+  <!-- Google Fonts for Kawaii Hacker aesthetic and modern UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="hacker-theme">
+  <!-- Scanline Overlay for CRT effect -->
+  <div class="crt-scanlines"></div>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="logo-symbol">&lt;//&gt;</span>
+      <h1 class="logo-text">SEC_OPS // <span class="accent-text-cyan">STUDY_PLAN_2025</span></h1>
+      <span class="blinking-cursor">_</span>
+    </div>
+    
+    <!-- Quotes & Motivation -->
+    <div class="motivational-banner">
+      <span class="terminal-prompt">$</span>
+      <span id="motivational-quote" class="quote-text">Initializing security modules...</span>
+    </div>
+
+    <!-- Quick Actions / Header Toggles -->
+    <div class="header-actions">
+      <!-- Palana Project Quick Toggle -->
+      <div class="toggle-container">
+        <span class="toggle-label">Palana Project (Position Pending)</span>
+        <label class="switch">
+          <input type="checkbox" id="palana-toggle" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <!-- Settings Icon Button -->
+      <button id="open-settings-btn" class="icon-btn" title="System Configuration">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Risk Indicator Bar (Flashes if the plan is at risk) -->
+  <div id="at-risk-warning" class="warning-banner hidden">
+    <div class="warning-content">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span>CRITICAL ALERT: Plan at risk of completion overflow. Current rollover tasks exceed target date (September 1, 2025). Please increase daily hours or adjust projects!</span>
+    </div>
+  </div>
+
+  <!-- Dashboard Overview / Main Panels -->
+  <main class="dashboard-content">
+    
+    <!-- Top Metrics Panel -->
+    <section class="metrics-grid">
+      <!-- Card: Overall Progress -->
+      <div class="metric-card glow-green">
+        <div class="metric-header">
+          <span class="metric-title">OVERALL_COMPLETION</span>
+          <span class="metric-icon">📈</span>
+        </div>
+        <div class="metric-value" id="metric-completion">0%</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="metric-completion-fill" style="width: 0%"></div>
+        </div>
+        <div class="metric-footer" id="metric-completion-sub">0/0 Tasks Done</div>
+      </div>
+
+      <!-- Card: Countdown -->
+      <div class="metric-card glow-cyan">
+        <div class="metric-header">
+          <span class="metric-title">DAYS_REMAINING</span>
+          <span class="metric-icon">⏰</span>
+        </div>
+        <div class="metric-value" id="metric-countdown">--</div>
+        <div class="metric-footer">Target: Sept 1, 2025</div>
+      </div>
+
+      <!-- Card: Daily Streak -->
+      <div class="metric-card glow-yellow">
+        <div class="metric-header">
+          <span class="metric-title">CURRENT_STREAK</span>
+          <span class="metric-icon">🔥</span>
+        </div>
+        <div class="metric-value" id="metric-streak">0 days</div>
+        <div class="metric-footer" id="metric-longest-streak">Longest: 0 days</div>
+      </div>
+
+      <!-- Card: LeetCode Tracker -->
+      <div class="metric-card glow-purple">
+        <div class="metric-header">
+          <span class="metric-title">LEETCODE_BLIND_75</span>
+          <span class="metric-icon">💻</span>
+        </div>
+        <div class="metric-value" id="metric-leetcode">0 / 75</div>
+        <div class="progress-bar-container">
+          <div class="progress-bar-fill" id="metric-leetcode-fill" style="width: 0%"></div>
+        </div>
+        <div class="metric-footer">1 problem per day standard</div>
+      </div>
+
+      <!-- Card: Certifications State -->
+      <div class="metric-card glow-orange">
+        <div class="metric-header">
+          <span class="metric-title">EXAM_STATUSES</span>
+          <span class="metric-icon">🏆</span>
+        </div>
+        <div class="cert-status-list">
+          <div class="cert-item">
+            <span class="cert-name">AWS Cloud Prac</span>
+            <span class="cert-badge status-todo" id="badge-aws">NOT STARTED</span>
+          </div>
+          <div class="cert-item">
+            <span class="cert-name">CompTIA Security+</span>
+            <span class="cert-badge status-todo" id="badge-secplus">NOT STARTED</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace Area -->
+    <div class="workspace-grid">
+      
+      <!-- Left Sidebar (Project Picker, Resource Panel, Legend) -->
+      <aside class="workspace-sidebar">
+        <!-- Project Switcher & Personal Project Tracker -->
+        <div class="panel-card glass-panel" id="project-selector-card">
+          <div class="panel-header">
+            <h3>[TRACK_4] cybersecurity_projects</h3>
+          </div>
+          <p class="panel-description">Scheduled after Security+ exam (~Aug 22). Select which projects to include in your plan (requires 3-4 hours/day each):</p>
+          <div class="project-checklist" id="project-options-list">
+            <!-- Dynamic project list loaded from JS -->
+          </div>
+        </div>
+
+        <!-- Resource Reference Box -->
+        <div class="panel-card glass-panel">
+          <div class="panel-header">
+            <h3>system_learning_links</h3>
+          </div>
+          <ul class="resource-links-list">
+            <li>
+              <span class="resource-cat-dot dot-portswigger"></span>
+              <a href="https://portswigger.net/web-security/all-topics" target="_blank">PortSwigger Web Academy</a>
+            </li>
+            <li>
+              <span class="resource-cat-dot dot-aws"></span>
+              <a href="https://skillbuilder.aws/exam-prep/cloud-practitioner" target="_blank">AWS Exam Prep (Skill Builder)</a>
+            </li>
+            <li>
+              <span class="resource-cat-dot dot-aws"></span>
+              <a href="https://tutorialsdojo.com/aws-cloud-practitioner-clf-c02-exam-guide/" target="_blank">Tutorials Dojo Practice Exams</a>
+            </li>
+            <li>
+              <span class="resource-cat-dot dot-secplus"></span>
+              <a href="https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" target="_blank">Professor Messer Sec+ Video Course</a>
+            </li>
+            <li>
+              <span class="resource-cat-dot dot-leetcode"></span>
+              <a href="https://neetcode.io/practice/practice/blind75" target="_blank">Neetcode Blind 75 Prep</a>
+            </li>
+            <li>
+              <span class="resource-cat-dot dot-projects"></span>
+              <a href="https://bestprojectideas.com/cybersecurity-project-ideas/" target="_blank">Cybersecurity Project Ideas</a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Color Code Legend -->
+        <div class="panel-card glass-panel legend-card">
+          <div class="panel-header">
+            <h3>category_legend</h3>
+          </div>
+          <div class="legend-grid">
+            <div class="legend-item"><span class="legend-dot dot-portswigger"></span> PortSwigger Labs</div>
+            <div class="legend-item"><span class="legend-dot dot-aws"></span> AWS Cloud Prac</div>
+            <div class="legend-item"><span class="legend-dot dot-secplus"></span> CompTIA Security+</div>
+            <div class="legend-item"><span class="legend-dot dot-leetcode"></span> LeetCode Blind 75</div>
+            <div class="legend-item"><span class="legend-dot dot-ahf"></span> AHF Tech Lead Work</div>
+            <div class="legend-item"><span class="legend-dot dot-info310"></span> INFO 310 Class</div>
+            <div class="legend-item"><span class="legend-dot dot-palana"></span> Palana Project</div>
+            <div class="legend-item"><span class="legend-dot dot-github"></span> GitHub Extension</div>
+            <div class="legend-item"><span class="legend-dot dot-projects"></span> Cyber Projects</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Calendar / Planner (Default View) -->
+      <section class="workspace-main glass-panel">
+        <div class="workspace-tabs-header">
+          <div class="tab-selectors">
+            <button class="tab-btn active" data-tab="calendar-tab">CALENDAR_VIEW</button>
+            <button class="tab-btn" data-tab="list-tab">TRACKS_CHECKLIST</button>
+          </div>
+          <div class="calendar-month-controls" id="month-tabs">
+            <!-- Buttons dynamically populated by JS (June, July, August, Sept) -->
+          </div>
+        </div>
+
+        <!-- Tab 1: Calendar View Content -->
+        <div class="tab-content active" id="calendar-tab">
+          <!-- Calendar Headings -->
+          <div class="calendar-grid-header">
+            <div>SUN</div><div>MON</div><div>TUE</div><div>WED</div><div>THU</div><div>FRI</div><div>SAT</div>
+          </div>
+          <!-- Days container -->
+          <div class="calendar-days-container" id="calendar-days-grid">
+            <!-- Days rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Track Checklists View -->
+        <div class="tab-content" id="list-tab">
+          <div class="tracks-container">
+            <!-- Track 1 checklist card -->
+            <div class="track-list-card">
+              <h4>TRACK 1: PortSwigger Web Academy (June 13 - June 27)</h4>
+              <p>Suggested Progression: Server-Side Topics (SQLi, Auth, Path Traversal, Command Injection) &rarr; Client-Side &rarr; Advanced Topics.</p>
+              <div class="track-substats" id="substats-portswigger">0 / 0 Completed</div>
+              <div class="track-items-list" id="list-portswigger-tasks"></div>
+            </div>
+
+            <!-- Track 2 checklist card -->
+            <div class="track-list-card">
+              <h4>TRACK 2: AWS Certified Cloud Practitioner (Exam June 23)</h4>
+              <p>Remaining Coursework (3 hours) &rarr; AWS Skill Builder Prep &rarr; Tutorials Dojo Exams.</p>
+              <div class="track-substats" id="substats-aws">0 / 0 Completed</div>
+              <div class="track-items-list" id="list-aws-tasks"></div>
+            </div>
+
+            <!-- Track 3 checklist card -->
+            <div class="track-list-card">
+              <h4>TRACK 3: CompTIA Security+ SY0-701 (Exam Target Aug 18-22)</h4>
+              <p>Video Lectures (Professor Messer 121 Videos) &rarr; Dion Practice Tests &rarr; Study Guides.</p>
+              <div class="track-substats" id="substats-secplus">0 / 0 Completed</div>
+              <div class="track-items-list" id="list-secplus-tasks"></div>
+            </div>
+
+            <!-- Track 4 checklist card -->
+            <div class="track-list-card">
+              <h4>TRACK 4: Cybersecurity Personal Projects (Aug 22 - Sep 1)</h4>
+              <p>Practical implementation, source control, documentation.</p>
+              <div class="track-substats" id="substats-projects">0 / 0 Completed</div>
+              <div class="track-items-list" id="list-projects-tasks"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Side Drawer Detail Panel (Day details checklist) -->
+  <div id="day-detail-drawer" class="day-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <span class="drawer-date-code" id="drawer-date-code">SYS_DAY_00</span>
+        <h2 id="drawer-date-title">June 13, 2025</h2>
+      </div>
+      <button id="close-drawer-btn" class="close-btn" title="Close Drawer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Capacity Info Row -->
+      <div class="drawer-capacity-info">
+        <div class="cap-stat">
+          <span class="cap-label">LOAD LIMIT</span>
+          <span class="cap-val" id="drawer-max-hours">8.0 hrs</span>
+        </div>
+        <div class="cap-stat">
+          <span class="cap-label">SCHEDULED WORK</span>
+          <span class="cap-val" id="drawer-scheduled-hours">0.0 hrs</span>
+        </div>
+        <div class="cap-stat">
+          <span class="cap-label">STATUS</span>
+          <span class="cap-val status-indicator" id="drawer-status">OPTIMAL</span>
+        </div>
+      </div>
+
+      <!-- Specific Note (e.g. India Trip indicator) -->
+      <div id="drawer-day-note" class="drawer-day-note hidden"></div>
+
+      <!-- Tasks Checklist Section -->
+      <div class="drawer-section">
+        <h3>DAILY_TASKS_CHECKLIST</h3>
+        <div class="tasks-checklist-container" id="drawer-tasks-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+
+      <!-- Rollover Button Section -->
+      <div class="rollover-action-area">
+        <p class="action-desc">Unfinished tasks will carry forward to subsequent days, reflowing dynamically under the daily limit.</p>
+        <button id="rollover-btn" class="rollover-btn">
+          <span class="btn-scan"></span>
+          <span class="btn-text">FORCE ROLLOVER // "I didn't finish today"</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Overlay Backdrop for Drawer & Modals -->
+  <div id="overlay-backdrop" class="overlay-backdrop"></div>
+
+  <!-- Settings Configuration Modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-header">
+      <h2>SYSTEM_CONFIGURATION_PANEL</h2>
+      <button id="close-settings-btn" class="close-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="settings-form" onsubmit="event.preventDefault();">
+        <!-- Daily capacity slider -->
+        <div class="form-group">
+          <label for="input-max-hours">Daily Max Capacity (Normal Days): <span id="val-max-hours">8</span> Hours</label>
+          <input type="range" id="input-max-hours" min="5" max="10" step="0.5" value="8">
+          <span class="field-help">Controls the ceiling for smart task reflowing (rollovers will cap work around this limit).</span>
+        </div>
+
+        <!-- Palana Toggle inside settings -->
+        <div class="form-group row-group">
+          <div class="form-text-block">
+            <label for="settings-palana-toggle">Palana Safety Project (Position Pending)</label>
+            <span class="field-help">Includes 8 hours/week (Mon-Thu 1.5h, Fri 2h). Toggling off deletes/excludes these blocks and frees up scheduled hours.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="settings-palana-toggle" checked>
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <!-- Manual Exam Status Toggle Checkboxes -->
+        <div class="form-group">
+          <label>Manual Certifications override</label>
+          <div class="checkbox-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="settings-aws-passed">
+              <span class="custom-checkbox"></span>
+              Mark AWS Practitioner Exam as Passed ✅
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="settings-secplus-passed">
+              <span class="custom-checkbox"></span>
+              Mark CompTIA Security+ Exam as Passed ✅
+            </label>
+          </div>
+        </div>
+
+        <!-- Warning / Destruction Action -->
+        <div class="danger-zone">
+          <h4>DANGER_ZONE</h4>
+          <p>Resetting wipes all local task tracking and rebuilds the default schedule from June 13, 2025.</p>
+          <button id="reset-system-btn" class="danger-btn">RESET_PLANNER_STATE</button>
+        </div>
+      </form>
+    </div>
+    
+    <div class="modal-footer">
+      <button id="save-settings-btn" class="modal-btn primary-btn">APPLY_CHANGES</button>
+    </div>
+  </div>
+
+  <!-- Script references -->
+  <script src="blind75.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
