@@ -820,13 +820,25 @@ function reflowRemainingCurriculum() {
   // Remove overflow days
   appState.days = appState.days.filter(d => !d.isOverflow);
 
+  // Track which project tasks are already completed anywhere in the plan
+  // so we don't re-schedule them when rebuilding the project backlog.
+  const completedProjectTitles = new Set();
+  appState.days.forEach(day => {
+    day.tasks.forEach(t => {
+      if (t.category === "projects" && t.completed) {
+        const clean = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+        completedProjectTitles.add(clean);
+      }
+    });
+  });
+
   for (let i = startReflowIndex; i < appState.days.length; i++) {
     const day = appState.days[i];
+    // Collect only non-project curriculum tasks — projects are rebuilt fresh below
     const curriculumTasks = day.tasks.filter(t => 
       t.category === "portswigger" || 
       t.category === "aws" || 
       t.category === "secplus" || 
-      t.category === "projects" ||
       t.title.includes("Rolled Over") // Preserve rolled-over routines
     );
     
@@ -841,7 +853,8 @@ function reflowRemainingCurriculum() {
       }
     });
 
-    // Remove uncompleted curriculum and rolled-over tasks
+    // Remove uncompleted curriculum, rolled-over tasks, AND all project tasks
+    // (project tasks are fully rebuilt below based on selectedProjects)
     day.tasks = day.tasks.filter(t => 
       t.completed || 
       !(t.category === "portswigger" || 
@@ -851,6 +864,24 @@ function reflowRemainingCurriculum() {
         t.title.includes("Rolled Over"))
     );
   }
+
+  // Rebuild project backlog from scratch using currently selected projects.
+  // Only include tasks that haven't been completed yet.
+  appState.settings.selectedProjects.forEach(projId => {
+    const proj = TRACK_4_PROJECTS.find(p => p.id === projId);
+    if (proj) {
+      proj.tasks.forEach(t => {
+        if (!completedProjectTitles.has(t.name)) {
+          curriculumBacklog.push({
+            category: "projects",
+            title: t.name,
+            duration: t.duration,
+            link: "https://bestprojectideas.com/cybersecurity-project-ideas/"
+          });
+        }
+      });
+    }
+  });
 
   // Sort backlog by original sequence
   const categoryOrder = { "portswigger": 1, "aws": 2, "secplus": 3, "projects": 4 };
