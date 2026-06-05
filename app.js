@@ -1408,6 +1408,11 @@ function showDayDetails(dateStr) {
       
       const linkHtml = task.link ? 
         `<a href="${task.link}" target="_blank" class="task-link-arrow" title="View Reference Link">&rarr;</a>` : '';
+
+      const isCustom = task.category === "custom";
+      const deleteHtml = isCustom
+        ? `<button class="task-delete-btn" title="Delete task">✕</button>`
+        : '';
       
       itemRow.innerHTML = `
         <label class="checkbox-container">
@@ -1422,7 +1427,20 @@ function showDayDetails(dateStr) {
           </div>
         </div>
         ${linkHtml}
+        ${deleteHtml}
       `;
+
+      // Delete button for custom tasks
+      if (isCustom) {
+        itemRow.querySelector('.task-delete-btn').addEventListener('click', () => {
+          playSynthSound("click");
+          day.tasks = day.tasks.filter(t => t.id !== task.id);
+          saveState();
+          renderDashboardMetrics();
+          renderCalendarDays();
+          showDayDetails(dateStr); // re-render drawer
+        });
+      }
       
       // Checkbox listener
       const cb = itemRow.querySelector('input');
@@ -1456,6 +1474,47 @@ function showDayDetails(dateStr) {
     });
   }
   
+  // Wire up Add Task button
+  const addTaskBtn = document.getElementById("add-task-btn");
+  const newTaskBtn = addTaskBtn.cloneNode(true); // clone to remove old listeners
+  addTaskBtn.parentNode.replaceChild(newTaskBtn, addTaskBtn);
+  newTaskBtn.addEventListener('click', () => {
+    const titleInput = document.getElementById("new-task-title");
+    const categoryInput = document.getElementById("new-task-category");
+    const durationInput = document.getElementById("new-task-duration");
+
+    const title = titleInput.value.trim();
+    const category = categoryInput.value;
+    const duration = parseFloat(durationInput.value) || 1;
+
+    if (!title) {
+      titleInput.focus();
+      titleInput.style.borderColor = "var(--neon-pink)";
+      setTimeout(() => titleInput.style.borderColor = "", 1000);
+      return;
+    }
+
+    const newTask = {
+      id: `${dateStr}_custom_${Date.now()}`,
+      category: category,
+      title: title,
+      duration: duration,
+      completed: false,
+      link: null
+    };
+
+    day.tasks.push(newTask);
+    saveState();
+    playSynthSound("success");
+    titleInput.value = "";
+    durationInput.value = "1";
+
+    // Re-render everything
+    renderDashboardMetrics();
+    renderCalendarDays();
+    showDayDetails(dateStr); // re-render drawer with new task
+  });
+
   // Open the drawer UI
   drawer.classList.add("open");
   backdrop.classList.add("active");

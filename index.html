@@ -327,6 +327,44 @@
         </div>
       </div>
 
+      <!-- Add Custom Task Section -->
+      <div class="drawer-section add-task-section">
+        <h3>ADD_CUSTOM_TASK</h3>
+        <div class="add-task-form" id="add-task-form">
+          <input
+            type="text"
+            id="new-task-title"
+            class="add-task-input"
+            placeholder="Task name..."
+            maxlength="80"
+          >
+          <div class="add-task-row">
+            <select id="new-task-category" class="add-task-select">
+              <option value="custom">custom</option>
+              <option value="portswigger">portswigger</option>
+              <option value="aws">aws</option>
+              <option value="secplus">secplus</option>
+              <option value="projects">projects</option>
+              <option value="leetcode">leetcode</option>
+              <option value="ahf">ahf</option>
+              <option value="palana">palana</option>
+              <option value="github">github</option>
+            </select>
+            <input
+              type="number"
+              id="new-task-duration"
+              class="add-task-duration"
+              placeholder="hrs"
+              min="0.25"
+              max="12"
+              step="0.25"
+              value="1"
+            >
+            <button id="add-task-btn" class="add-task-btn">+ ADD</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Rollover Button Section -->
       <div class="rollover-action-area">
         <p class="action-desc">Unfinished tasks will carry forward to subsequent days, reflowing dynamically under the daily limit.</p>

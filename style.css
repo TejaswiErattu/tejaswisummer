@@ -1672,3 +1672,115 @@ input:checked + .slider:before {
   color: #ff6060;
 }
 
+
+/* ── ADD CUSTOM TASK FORM ───────────────────────────────────── */
+.add-task-section {
+  margin-top: 0.25rem;
+}
+
+.add-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.add-task-input {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.45rem 0.7rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.add-task-input:focus {
+  border-color: var(--neon-cyan);
+}
+
+.add-task-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.add-task-select {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.4rem 0.5rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.add-task-select option {
+  background: #1a1a2e;
+  color: var(--text-primary);
+}
+
+.add-task-duration {
+  width: 4.5rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.5rem;
+  outline: none;
+  text-align: center;
+}
+
+.add-task-btn {
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.35);
+  color: var(--neon-green);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.add-task-btn:hover {
+  background: rgba(0, 255, 136, 0.2);
+  border-color: var(--neon-green);
+}
+
+/* Delete button for custom tasks */
+.task-delete-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 80, 80, 0.5);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.task-delete-btn:hover {
+  color: #ff5555;
+  background: rgba(255, 80, 80, 0.1);
+}
+
+/* Custom category badge */
+.badge-custom {
+  background: rgba(200, 100, 255, 0.15);
+  color: #d088ff;
+  border: 1px solid rgba(200, 100, 255, 0.3);
+}
