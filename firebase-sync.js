@@ -56,8 +56,12 @@ async function saveStateToFirestore() {
       email: currentUser.email
     });
   } catch (e) {
-    console.error("Firebase save error:", e);
-    showAuthToast("Cloud save failed. Progress still saved locally.", "error");
+    console.error("Firebase save error:", e.code, e.message);
+    if (e.code === "permission-denied") {
+      showAuthToast("☁️ Cloud blocked by Firestore rules — see setup. Saved locally.", "error");
+    } else {
+      showAuthToast("Cloud save failed. Progress still saved locally.", "error");
+    }
   } finally {
     isSyncing = false;
   }
