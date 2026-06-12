@@ -1262,13 +1262,14 @@ function renderCalendarDays() {
   const container = document.getElementById("calendar-days-grid");
   container.innerHTML = "";
   
-  // Calculate padding days for start of month
-  // E.g., June 2026 starts on a Friday
-  const activeYear = parseInt(activeMonth.split('-')[0]);
-  const activeMonthIndex = parseInt(activeMonth.split('-')[1]) - 1;
+  // Filter days belonging to activeMonth
+  const monthDays = appState.days.filter(d => d.date.startsWith(activeMonth));
+  if (monthDays.length === 0) return;
   
-  const firstDay = new Date(activeYear, activeMonthIndex, 1);
-  const startDayPadding = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  // Calculate padding based on the day-of-week of the FIRST day actually present
+  // in the data for this month. The plan starts mid-month (June 13), so we can't
+  // assume the month begins on the 1st — otherwise the grid columns misalign.
+  const startDayPadding = getDayOfWeek(monthDays[0].date); // 0 = Sunday ... 6 = Saturday
   
   // Add empty grid slots for padding
   for (let i = 0; i < startDayPadding; i++) {
@@ -1276,9 +1277,6 @@ function renderCalendarDays() {
     emptyCell.className = "day-cell empty-day";
     container.appendChild(emptyCell);
   }
-  
-  // Filter days belonging to activeMonth
-  const monthDays = appState.days.filter(d => d.date.startsWith(activeMonth));
   
   monthDays.forEach(day => {
     const dayCell = document.createElement("div");
