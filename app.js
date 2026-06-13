@@ -140,6 +140,11 @@ const CORE_CURRICULUM = {
 };
 
 // 4. GLOBAL STATE VARIABLES
+
+// Bump this whenever the schedule-generation logic changes. On load, saved states
+// (local + cloud) with an older version auto-migrate while preserving completed tasks.
+const SCHEDULE_VERSION = 2;
+
 let appState = {
   settings: {
     maxNormalDailyHours: 8,
@@ -147,7 +152,8 @@ let appState = {
     awsExamPassed: false,
     securityPlusExamPassed: false,
     selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"], // default projects
-    lastRolloverDay: null // date string representing the last day forced rollover
+    lastRolloverDay: null, // date string representing the last day forced rollover
+    scheduleVersion: SCHEDULE_VERSION
   },
   days: [] // array of all days
 };
@@ -159,6 +165,22 @@ const INDIA_START_STR = "2026-06-24";
 const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
 const INFO_END_STR = "2026-08-21";
+
+// Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
+// front-loaded into the lead-up window (plan start → day before onboarding).
+const PALANA_ONBOARDING_STR = "2026-06-27";
+const PALANA_PREP_TASKS = [
+  "Palana Prep: Company mission, safety domain & product deep-dive",
+  "Palana Prep: Set up dev environment, accounts & onboarding tooling",
+  "Palana Prep: Study the tech stack & architecture documentation",
+  "Palana Prep: Review safety/compliance standards & domain knowledge",
+  "Palana Prep: Role-specific skill brush-up & hands-on exercises",
+  "Palana Prep: Read team repos, codebase & contribution guidelines",
+  "Palana Prep: Draft onboarding goals, questions & a 30-day plan",
+  "Palana Prep: Research the team & prepare intro/networking notes",
+  "Palana Prep: Mock tasks & practice in the problem space",
+  "Palana Prep: Consolidate notes & final onboarding readiness review"
+];
 
 // 5. HELPER DATE FUNCTIONS
 function parseDate(dateStr) {
@@ -191,6 +213,51 @@ function isIndiaTrip(dateStr) {
 
 function isInfo310Class(dateStr) {
   return dateStr >= INFO_START_STR && dateStr <= INFO_END_STR;
+}
+
+// True during the Palana onboarding lead-up window (plan start → day before onboarding).
+function isPalanaPrepWindow(dateStr) {
+  return dateStr >= START_DATE_STR && dateStr < PALANA_ONBOARDING_STR;
+}
+
+// Builds the Palana task for a given day (or null if none should be scheduled).
+// Before onboarding: intensive daily "Palana Onboarding Prep" blocks.
+// After onboarding: regular weekday safety-engineering work blocks.
+function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
+  if (!appState.settings.palanaEnabled) return null;
+  if (isIndia) return null; // India trip is capacity-capped; no Palana blocks
+
+  if (isPalanaPrepWindow(dateStr)) {
+    // Intensive onboarding prep — front-loaded before the job starts.
+    let hours;
+    if (dayOfWeek === 0) hours = 1.0;        // Sunday (light, it's a rest day)
+    else if (dayOfWeek === 6) hours = 2.0;   // Saturday
+    else hours = 3.0;                         // Weekday — intensive
+    const offset = getDaysBetween(START_DATE_STR, dateStr);
+    const title = PALANA_PREP_TASKS[offset % PALANA_PREP_TASKS.length];
+    return {
+      id: `${dateStr}_palana`,
+      category: "palana",
+      title: `🚀 ${title}`,
+      duration: hours,
+      completed: false,
+      link: null
+    };
+  }
+
+  // Regular Palana work after onboarding (weekdays only): Mon-Thu 1.5h, Fri 2h.
+  if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+    const palanaHours = (dayOfWeek === 5) ? 2.0 : 1.5;
+    return {
+      id: `${dateStr}_palana`,
+      category: "palana",
+      title: "Palana Work (Safety Engineering)",
+      duration: palanaHours,
+      completed: false,
+      link: null
+    };
+  }
+  return null;
 }
 
 // Check if a day is a rest day (for capacity variation)
@@ -274,22 +341,16 @@ function generateBaseSchedule() {
       });
     }
 
-    // 4. Palana Safety Project (8 hours/week on weekdays, unless on India Trip)
-    // Mon-Thu 1.5h, Fri 2.0h
-    if (appState.settings.palanaEnabled && isWeekday && !isIndia) {
-      const palanaHours = (dayOfWeek === 5) ? 2.0 : 1.5;
-      dayObj.tasks.push({
-        id: `${dateStr}_palana`,
-        category: "palana",
-        title: "Palana Project (Position Pending)",
-        duration: palanaHours,
-        completed: false,
-        link: null
-      });
+    // 4. Palana — intensive onboarding prep before the job starts (week of June 27),
+    //    then regular safety-engineering work blocks afterwards.
+    const palanaTask = buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia);
+    if (palanaTask) {
+      dayObj.tasks.push(palanaTask);
     }
 
-    // 5. GitHub Extension Passion Project (2 hours/week, Saturday preferred, unless on India Trip)
-    if (dayOfWeek === 6 && !isIndia) {
+    // 5. GitHub Extension Passion Project (2 hours/week, Saturday preferred, unless on India Trip).
+    //    Paused on Palana-prep Saturdays so the day stays within capacity for job prep.
+    if (dayOfWeek === 6 && !isIndia && !(appState.settings.palanaEnabled && isPalanaPrepWindow(dateStr))) {
       dayObj.tasks.push({
         id: `${dateStr}_github`,
         category: "github",
@@ -704,6 +765,24 @@ function reflowRemainingCurriculum() {
     });
   }
 
+  // Snapshot the uncompleted curriculum backlog BEFORE rebuilding routines below,
+  // because that rebuild clears each day's task list. (Without this, toggling
+  // Palana/settings would silently wipe all PortSwigger/AWS/Sec+ tasks.)
+  const curriculumBacklog = [];
+  for (let i = startReflowIndex; i < appState.days.length; i++) {
+    appState.days[i].tasks.forEach(t => {
+      const isCurriculum = t.category === "portswigger" || t.category === "aws" || t.category === "secplus";
+      if (!t.completed && (isCurriculum || t.title.includes("Rolled Over"))) {
+        curriculumBacklog.push({
+          category: t.category,
+          title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""),
+          duration: t.duration,
+          link: t.link
+        });
+      }
+    });
+  }
+
   // Re-generate fixed routines for days >= startReflowIndex (to apply Palana/capacity edits)
   for (let i = startReflowIndex; i < appState.days.length; i++) {
     const day = appState.days[i];
@@ -788,21 +867,17 @@ function reflowRemainingCurriculum() {
       });
     }
 
-    // Palana (unless completed)
-    if (appState.settings.palanaEnabled && isWeekday && !isIndia && !day.tasks.some(t => t.category === "palana")) {
-      const palanaHours = (dayOfWeek === 5) ? 2.0 : 1.5;
-      day.tasks.push({
-        id: `${day.date}_palana`,
-        category: "palana",
-        title: "Palana Project (Position Pending)",
-        duration: palanaHours,
-        completed: false,
-        link: null
-      });
+    // Palana — intensive onboarding prep in lead-up window, regular work after
+    // (unless a Palana task is already present/completed for this day)
+    if (!day.tasks.some(t => t.category === "palana")) {
+      const palanaTask = buildPalanaTaskForDay(day.date, dayOfWeek, isIndia);
+      if (palanaTask) {
+        day.tasks.push(palanaTask);
+      }
     }
 
-    // Git Project (unless completed)
-    if (dayOfWeek === 6 && !isIndia && !day.tasks.some(t => t.category === "github")) {
+    // Git Project (unless completed). Paused on Palana-prep Saturdays for job-prep capacity.
+    if (dayOfWeek === 6 && !isIndia && !(appState.settings.palanaEnabled && isPalanaPrepWindow(day.date)) && !day.tasks.some(t => t.category === "github")) {
       day.tasks.push({
         id: `${day.date}_github`,
         category: "github",
@@ -814,10 +889,7 @@ function reflowRemainingCurriculum() {
     }
   }
 
-  // Collect all uncompleted curriculum tasks and rolled-over routines from days >= startReflowIndex
-  const curriculumBacklog = [];
-  
-  // Remove overflow days
+  // Remove overflow days (recreated during distribution if the plan runs long)
   appState.days = appState.days.filter(d => !d.isOverflow);
 
   // Track which project tasks are already completed anywhere in the plan
@@ -831,39 +903,6 @@ function reflowRemainingCurriculum() {
       }
     });
   });
-
-  for (let i = startReflowIndex; i < appState.days.length; i++) {
-    const day = appState.days[i];
-    // Collect only non-project curriculum tasks — projects are rebuilt fresh below
-    const curriculumTasks = day.tasks.filter(t => 
-      t.category === "portswigger" || 
-      t.category === "aws" || 
-      t.category === "secplus" || 
-      t.title.includes("Rolled Over") // Preserve rolled-over routines
-    );
-    
-    curriculumTasks.forEach(t => {
-      if (!t.completed) {
-        curriculumBacklog.push({
-          category: t.category,
-          title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""),
-          duration: t.duration,
-          link: t.link
-        });
-      }
-    });
-
-    // Remove uncompleted curriculum, rolled-over tasks, AND all project tasks
-    // (project tasks are fully rebuilt below based on selectedProjects)
-    day.tasks = day.tasks.filter(t => 
-      t.completed || 
-      !(t.category === "portswigger" || 
-        t.category === "aws" || 
-        t.category === "secplus" || 
-        t.category === "projects" ||
-        t.title.includes("Rolled Over"))
-    );
-  }
 
   // Rebuild project backlog from scratch using currently selected projects.
   // Only include tasks that haven't been completed yet.
@@ -927,6 +966,17 @@ function generateNewState() {
   saveState();
 }
 
+// Upgrades an older saved schedule (local or cloud) to the current SCHEDULE_VERSION.
+// Re-applies routines (including the new Palana onboarding prep) and redistributes
+// curriculum while preserving any tasks already marked complete. Returns true if it ran.
+function migrateScheduleIfNeeded() {
+  if (!appState || !appState.settings || !appState.days || appState.days.length === 0) return false;
+  if (appState.settings.scheduleVersion === SCHEDULE_VERSION) return false;
+  appState.settings.scheduleVersion = SCHEDULE_VERSION;
+  reflowRemainingCurriculum(); // preserves completed tasks; re-renders + saves
+  return true;
+}
+
 function resetPlannerState() {
   localStorage.removeItem("cyber_study_plan_state_2026");
   appState.settings = {
@@ -935,7 +985,8 @@ function resetPlannerState() {
     awsExamPassed: false,
     securityPlusExamPassed: false,
     selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"],
-    lastRolloverDay: null
+    lastRolloverDay: null,
+    scheduleVersion: SCHEDULE_VERSION
   };
   generateNewState();
   initUI();
@@ -1627,6 +1678,7 @@ function cycleQuotes() {
 document.addEventListener("DOMContentLoaded", () => {
   // Load local storage state
   loadState();
+  migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
   initUI();
   
   // 1. Overlay click handler

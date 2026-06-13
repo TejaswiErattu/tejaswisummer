@@ -39,6 +39,9 @@ auth.onAuthStateChanged(async (user) => {
     // User just signed in — load their cloud state
     showAuthToast("Loading your cloud save...", "info");
     await loadStateFromFirestore();
+    if (typeof migrateScheduleIfNeeded === "function") {
+      migrateScheduleIfNeeded(); // upgrade older cloud schedules (adds Palana onboarding prep)
+    }
     initUI();
     showAuthToast(`Synced ☁️ Welcome back, ${user.displayName?.split(' ')[0] || 'hacker'}!`, "success");
   }

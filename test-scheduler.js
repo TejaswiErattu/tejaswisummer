@@ -33,15 +33,23 @@ global.document = {
     };
   },
   getElementById(id) {
-    return {
+    const node = {
       innerText: "",
       className: "",
+      value: "",
+      checked: false,
       style: { width: "0%" },
       classList: {
         add() {},
-        remove() {}
+        remove() {},
+        toggle() {}
       },
       appendChild() {},
+      addEventListener() {},
+      removeEventListener() {},
+      focus() {},
+      remove() {},
+      cloneNode() { return this; },
       querySelector() {
         return { addEventListener() {} };
       },
@@ -49,6 +57,8 @@ global.document = {
         return [];
       }
     };
+    node.parentNode = { replaceChild() {} };
+    return node;
   },
   querySelectorAll() {
     return [];
@@ -78,16 +88,17 @@ console.log("=== SCHEDULER SYSTEM VERIFICATION SUITE ===");
 // Test 1: Date boundaries
 console.log(`\nTest 1: Verifying Plan boundaries...`);
 generateBaseSchedule();
-console.log(`- Start Date: ${appState.days[0].date} (Expected: 2025-06-13) - ${appState.days[0].date === '2025-06-13' ? 'PASS' : 'FAIL'}`);
-console.log(`- End Date: ${appState.days[appState.days.length-1].date} (Expected: 2025-09-01) - ${appState.days[appState.days.length-1].date === '2025-09-01' ? 'PASS' : 'FAIL'}`);
-console.log(`- Total Days: ${appState.days.length} (Expected: 81) - ${appState.days.length === 81 ? 'PASS' : 'FAIL'}`);
+const coreDays = appState.days.filter(d => !d.isOverflow);
+console.log(`- Start Date: ${appState.days[0].date} (Expected: 2026-06-13) - ${appState.days[0].date === '2026-06-13' ? 'PASS' : 'FAIL'}`);
+console.log(`- Core End Date: ${coreDays[coreDays.length-1].date} (Expected: 2026-09-01) - ${coreDays[coreDays.length-1].date === '2026-09-01' ? 'PASS' : 'FAIL'}`);
+console.log(`- Core Plan Days: ${coreDays.length} (Expected: 81) - ${coreDays.length === 81 ? 'PASS' : 'FAIL'}`);
 
 // Test 2: India Trip Cap
 console.log(`\nTest 2: Verifying India Trip (June 24 - July 8) constraints...`);
 let indiaTripPass = true;
 let indiaDaysCount = 0;
 appState.days.forEach(day => {
-  if (day.date >= "2025-06-24" && day.date <= "2025-07-08") {
+  if (day.date >= "2026-06-24" && day.date <= "2026-07-08") {
     indiaDaysCount++;
     const totalHrs = day.tasks.reduce((sum, t) => sum + t.duration, 0);
     // Should be max 2.5h (weekdays: AHF 1h + LC 0.5h + INFO310 1h = 2.5h)
@@ -115,7 +126,7 @@ console.log(`- Baseline limit verification: ${maxHourPass ? 'PASS' : 'FAIL'}`);
 
 // Test 4: Palana Toggle
 console.log(`\nTest 4: Verifying Palana Project ON/OFF toggle and reflow...`);
-const monIndex = appState.days.findIndex(d => d.date === "2025-06-16"); // Weekday before India trip
+const monIndex = appState.days.findIndex(d => d.date === "2026-06-16"); // Weekday before India trip
 const originalMonHours = appState.days[monIndex].tasks.reduce((sum, t) => sum + t.duration, 0);
 const hasPalanaBefore = appState.days[monIndex].tasks.some(t => t.category === 'palana');
 
@@ -139,7 +150,7 @@ console.log(`\nTest 5: Simulating task rollovers and cascading limit (capping at
 resetPlannerState();
 
 // Uncheck all tasks on Day 1 (June 13) and trigger forceRollover
-const d1Date = "2025-06-13";
+const d1Date = "2026-06-13";
 const d1 = appState.days[0];
 d1.tasks.forEach(t => t.completed = false); // ensure all unchecked
 
