@@ -1784,3 +1784,303 @@ input:checked + .slider:before {
   color: #d088ff;
   border: 1px solid rgba(200, 100, 255, 0.3);
 }
+
+/* ==========================================================================
+   REPORTS & EXPORT  (dashboard section + options modal)
+   ========================================================================== */
+.export-section {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.export-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.export-section-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.export-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(255, 121, 198, 0.5));
+}
+
+.export-section-title h3 {
+  font-size: 0.9rem;
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px rgba(255, 121, 198, 0.25);
+}
+
+.export-section-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+  max-width: 560px;
+}
+
+.last-export-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--neon-green);
+  background: rgba(80, 250, 123, 0.06);
+  border: 1px solid rgba(80, 250, 123, 0.25);
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.last-export-label.muted-empty {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 121, 198, 0.12);
+}
+
+.export-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border-neon-pink);
+  background: rgba(255, 121, 198, 0.06);
+  color: #ffb8d1;
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  background: rgba(255, 121, 198, 0.14);
+  box-shadow: var(--glow-pink);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.export-btn-primary {
+  background: var(--neon-pink);
+  border-color: var(--neon-pink);
+  color: var(--text-dark);
+}
+
+.export-btn-primary:hover {
+  background: transparent;
+  color: var(--neon-pink);
+}
+
+.export-btn-ghost {
+  background: transparent;
+  border-color: var(--border-neon-purple);
+  color: var(--neon-purple);
+}
+
+.export-btn-ghost:hover {
+  background: rgba(189, 147, 249, 0.1);
+  box-shadow: var(--glow-purple);
+  color: #fff;
+}
+
+.export-btn:disabled,
+.export-btn.is-busy {
+  opacity: 0.6;
+  cursor: progress;
+  transform: none;
+  box-shadow: none;
+}
+
+.export-btn-ico {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* Wide modal for export config */
+.modal-wide {
+  max-width: 720px;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.export-subhead {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--neon-cyan);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(139, 233, 253, 0.15);
+}
+
+.export-radio-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.export-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.export-radio:hover {
+  background: rgba(255, 121, 198, 0.05);
+}
+
+.export-radio input {
+  accent-color: var(--neon-pink);
+  width: 15px;
+  height: 15px;
+}
+
+.export-range-wrap {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem 0.5rem 1.7rem;
+}
+
+.export-range-wrap.active {
+  display: flex;
+}
+
+.export-date-input {
+  background: #1a0f29;
+  border: 1px solid var(--border-neon-pink);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 5px;
+  color-scheme: dark;
+}
+
+.range-dash {
+  color: var(--text-muted);
+}
+
+.export-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+}
+
+.export-check {
+  font-size: 0.78rem !important;
+  color: var(--text-primary);
+  gap: 0.5rem;
+}
+
+/* Preview box */
+.export-preview {
+  margin-top: 1.25rem;
+  background: rgba(139, 233, 253, 0.03);
+  border: 1px solid rgba(139, 233, 253, 0.15);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+}
+
+.export-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.export-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.export-preview-item.full {
+  grid-column: 1 / -1;
+}
+
+.ep-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ep-val {
+  font-size: 0.82rem;
+  color: var(--neon-cyan);
+  font-weight: 500;
+}
+
+/* Status / error line */
+.export-status {
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  min-height: 1.1rem;
+  text-align: center;
+}
+
+.export-status.working { color: var(--neon-yellow); }
+.export-status.ok { color: var(--neon-green); }
+.export-status.err {
+  color: #ffa4bc;
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid var(--neon-pink);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.export-footer {
+  flex-wrap: wrap;
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border-neon-purple);
+  color: var(--text-muted);
+}
+
+.ghost-btn:hover {
+  border-color: var(--neon-purple);
+  color: var(--neon-purple);
+}
+
+.modal-btn:disabled,
+.modal-btn.is-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (max-width: 640px) {
+  .export-grid { grid-template-columns: 1fr; gap: 1.1rem; }
+  .export-preview-grid { grid-template-columns: 1fr 1fr; }
+  .export-check-grid { grid-template-columns: 1fr; }
+  .export-actions .export-btn { flex: 1 1 auto; justify-content: center; }
+  .export-section-head { flex-direction: column; }
+}
+

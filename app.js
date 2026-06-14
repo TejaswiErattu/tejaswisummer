@@ -668,6 +668,16 @@ function forceRollover(dayDateStr) {
       const isCurriculum = t.category === "portswigger" || t.category === "aws" ||
                            t.category === "secplus" || t.category === "projects";
       if (isCurriculum) {
+        // Record reschedule history in a lightweight ledger (keyed by clean title)
+        // so exports can report original date, move count, and last-moved-from.
+        const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+        appState.rescheduleLedger = appState.rescheduleLedger || {};
+        const led = appState.rescheduleLedger[cleanTitle] || { originalDate: (t.originalDate || day.date), count: 0 };
+        led.count += 1;
+        led.lastMovedFrom = day.date;
+        led.movedOn = new Date().toISOString();
+        appState.rescheduleLedger[cleanTitle] = led;
+
         pastUncompletedTasks.push({
           category: t.category,
           title: t.title.replace(" (Part A)", "").replace(" (Part B)", "") + " (Rolled Over)",
@@ -1496,9 +1506,14 @@ function showDayDetails(dateStr) {
       cb.addEventListener('change', (e) => {
         task.completed = e.target.checked;
         if (task.completed) {
+          // Record completion metadata for accurate exports / reporting
+          task.completedAt = new Date().toISOString();
+          task.completedOnDate = dateStr;
           playSynthSound("success");
           spawnSparkles(e);
         } else {
+          delete task.completedAt;
+          delete task.completedOnDate;
           playSynthSound("click");
         }
         saveState();

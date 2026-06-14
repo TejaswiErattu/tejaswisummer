@@ -20,8 +20,40 @@ cybersecurity-study-plan/
 ├── style.css         # Styling system, responsive grid, visual effects
 ├── app.js            # Scheduling rules, rollover algorithms, state engine
 ├── blind75.js        # Blind 75 questions database with URLs
+├── export.js         # Excel (.xlsx) + CSV export engine (live snapshot)
 └── README.md         # Documentation and instructions (this file)
 ```
+
+## Excel / CSV Export
+
+The **Reports // Data_Export** panel on the dashboard turns your *live* plan into a
+polished, multi-sheet Excel workbook (or a simple CSV) — entirely in the browser,
+with no server.
+
+- **Download Excel** — generates `Cybersecurity_Summer_Study_Plan_<download-date>.xlsx`
+  with 10 worksheets: Dashboard Summary, Full Schedule, Completed Tasks,
+  Unfinished &amp; Rescheduled, Weekly Progress, Certifications, LeetCode 75,
+  Projects, Resources, and Settings &amp; Availability.
+- **Download CSV** — exports the Full Schedule sheet only, for quick/simple use.
+- **Export Options…** — choose a scope (full / current week / custom date range /
+  completed-only / unfinished-only / certifications-only / projects-only), toggle
+  categories (AHF, Palana, INFO 310, LeetCode, optional, skipped, resource links,
+  notes), and see a **live preview** of task count, date range, worksheets, and hours
+  before downloading.
+
+The workbook always reflects the current saved state — task edits, completion
+updates, rescheduling, removed optional tasks, and settings. It includes bold/frozen
+headers, autofilters, clickable hyperlinks, date/hour/percent number formats,
+alternating row shading, in-cell progress bars, and **status-based conditional
+colors** (Completed = green, In Progress = blue, Partial = yellow, Rescheduled =
+orange, Overdue/High-Risk = red, Skipped = gray) with the written status always kept
+for accessibility. A **"Last Excel export"** timestamp is shown on the dashboard.
+
+> Excel generation uses [ExcelJS](https://github.com/exceljs/exceljs) and
+> [FileSaver.js](https://github.com/eligrey/FileSaver.js), lazy-loaded from a CDN on
+> first export. (Charts: because no reliable serverless library can embed native
+> Excel charts, visuals are rendered as colored cells and in-cell bars; select any
+> table and use Excel's *Insert ▸ Chart* for native charts.)
 
 ## Running the Dashboard
 

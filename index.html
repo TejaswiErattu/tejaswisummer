@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260613b">
+  <link rel="stylesheet" href="style.css?v=20260613c">
 </head>
 <body class="hacker-theme">
   <!-- Scanline Overlay for CRT effect -->
@@ -148,6 +148,31 @@
             <span class="cert-badge status-todo" id="badge-secplus">NOT STARTED</span>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- Reports & Export Section -->
+    <section class="export-section glass-panel" id="reports-export">
+      <div class="export-section-head">
+        <div class="export-section-title">
+          <span class="export-emoji">📊</span>
+          <div>
+            <h3>REPORTS // DATA_EXPORT</h3>
+            <p class="export-section-sub">Download a complete, live snapshot of your plan — completed, remaining, rescheduled &amp; on-track status.</p>
+          </div>
+        </div>
+        <span class="last-export-label muted-empty" id="last-export-label">Last Excel export: never</span>
+      </div>
+      <div class="export-actions">
+        <button id="dash-export-excel" class="export-btn export-btn-primary" title="Download a full .xlsx workbook">
+          <span class="export-btn-ico">⬇️</span> Download Excel
+        </button>
+        <button id="dash-export-csv" class="export-btn" title="Download the Full Schedule as CSV">
+          <span class="export-btn-ico">📄</span> Download CSV
+        </button>
+        <button id="dash-export-options" class="export-btn export-btn-ghost" title="Choose what to export">
+          <span class="export-btn-ico">⚙️</span> Export Options…
+        </button>
       </div>
     </section>
 
@@ -445,15 +470,86 @@
     </div>
   </div>
 
+  <!-- Export / Reports Configuration Modal -->
+  <div id="export-modal" class="modal modal-wide">
+    <div class="modal-header">
+      <h2>EXPORT_CONFIG // REPORT_BUILDER</h2>
+      <button id="export-close-btn" class="close-btn" title="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="export-grid">
+        <!-- Scope -->
+        <div class="export-col">
+          <h4 class="export-subhead">① EXPORT SCOPE</h4>
+          <div class="export-radio-list">
+            <label class="export-radio"><input type="radio" name="export-scope" value="full" checked><span>Full workbook</span></label>
+            <label class="export-radio"><input type="radio" name="export-scope" value="week"><span>Current week only</span></label>
+            <label class="export-radio"><input type="radio" name="export-scope" value="range"><span>Custom date range</span></label>
+            <div class="export-range-wrap" id="export-range-wrap">
+              <input type="date" id="export-range-start" class="export-date-input">
+              <span class="range-dash">→</span>
+              <input type="date" id="export-range-end" class="export-date-input">
+            </div>
+            <label class="export-radio"><input type="radio" name="export-scope" value="completed"><span>Completed tasks only</span></label>
+            <label class="export-radio"><input type="radio" name="export-scope" value="unfinished"><span>Unfinished tasks only</span></label>
+            <label class="export-radio"><input type="radio" name="export-scope" value="certs"><span>Certification progress only</span></label>
+            <label class="export-radio"><input type="radio" name="export-scope" value="projects"><span>Project progress only</span></label>
+          </div>
+        </div>
+
+        <!-- Include toggles -->
+        <div class="export-col">
+          <h4 class="export-subhead">② INCLUDE / EXCLUDE</h4>
+          <div class="export-check-grid">
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-ahf" checked><span class="custom-checkbox"></span>AHF tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-palana" checked><span class="custom-checkbox"></span>Palana tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-info310" checked><span class="custom-checkbox"></span>INFO 310 tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-leetcode" checked><span class="custom-checkbox"></span>LeetCode tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-optional" checked><span class="custom-checkbox"></span>Optional tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-skipped" checked><span class="custom-checkbox"></span>Skipped tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-resources" checked><span class="custom-checkbox"></span>Resource links</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-notes" checked><span class="custom-checkbox"></span>Reflections &amp; notes</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live preview -->
+      <div class="export-preview">
+        <h4 class="export-subhead">③ PREVIEW</h4>
+        <div class="export-preview-grid">
+          <div class="export-preview-item"><span class="ep-label">Tasks</span><span class="ep-val" id="export-preview-tasks">—</span></div>
+          <div class="export-preview-item"><span class="ep-label">Date range</span><span class="ep-val" id="export-preview-range">—</span></div>
+          <div class="export-preview-item"><span class="ep-label">Est. hours</span><span class="ep-val" id="export-preview-hours">—</span></div>
+          <div class="export-preview-item full"><span class="ep-label">Worksheets</span><span class="ep-val" id="export-preview-sheets">—</span></div>
+        </div>
+      </div>
+
+      <div class="export-status" id="export-status"></div>
+    </div>
+
+    <div class="modal-footer export-footer">
+      <button id="export-cancel-btn" class="modal-btn ghost-btn">CANCEL</button>
+      <button id="export-do-csv" class="modal-btn">⬇ CSV</button>
+      <button id="export-do-excel" class="modal-btn primary-btn">⬇ DOWNLOAD EXCEL</button>
+    </div>
+  </div>
+
   <!-- Firebase SDK (compat version) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <!-- Script references -->
-  <script src="blind75.js?v=20260613b"></script>
-  <script src="firebase-config.js?v=20260613b"></script>
-  <script src="app.js?v=20260613b"></script>
-  <script src="firebase-sync.js?v=20260613b"></script>
+  <script src="blind75.js?v=20260613c"></script>
+  <script src="firebase-config.js?v=20260613c"></script>
+  <script src="app.js?v=20260613c"></script>
+  <script src="export.js?v=20260613c"></script>
+  <script src="firebase-sync.js?v=20260613c"></script>
 </body>
 </html>
