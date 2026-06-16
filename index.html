@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260613c">
+  <link rel="stylesheet" href="style.css?v=20260616">
 </head>
 <body class="hacker-theme">
   <!-- Scanline Overlay for CRT effect -->
@@ -52,7 +52,7 @@
     <div class="header-actions">
       <!-- Palana Project Quick Toggle -->
       <div class="toggle-container">
-        <span class="toggle-label">Palana Project (Position Pending)</span>
+        <span class="toggle-label">Palana Preparation</span>
         <label class="switch">
           <input type="checkbox" id="palana-toggle" checked>
           <span class="slider round"></span>
@@ -151,6 +151,13 @@
       </div>
     </section>
 
+    <!-- Today Section -->
+    <section class="today-section glass-panel" id="today-section">
+      <div id="today-section-container">
+        <!-- Populated by renderTodaySection() -->
+      </div>
+    </section>
+
     <!-- Reports & Export Section -->
     <section class="export-section glass-panel" id="reports-export">
       <div class="export-section-head">
@@ -238,9 +245,12 @@
             <div class="legend-item"><span class="legend-dot dot-ahf"></span> AHF Tech Lead Work</div>
             <div class="legend-item"><span class="legend-dot dot-info310"></span> INFO 310 Class</div>
             <div class="legend-item"><span class="legend-dot dot-palana"></span> Palana Project</div>
-            <div class="legend-item"><span class="legend-dot dot-github"></span> GitHub Extension</div>
+            <div class="legend-item"><span class="legend-dot dot-github"></span> Git Developer Tool</div>
+            <div class="legend-item"><span class="legend-dot dot-winfo"></span> WINFO</div>
+            <div class="legend-item"><span class="legend-dot dot-mentor"></span> Mentor Meetings</div>
             <div class="legend-item"><span class="legend-dot dot-projects"></span> Cyber Projects</div>
           </div>
+          <button id="open-category-manager-btn" class="category-manager-btn">+ Manage Categories</button>
         </div>
       </aside>
 
@@ -310,6 +320,22 @@
       </section>
 
     </div>
+
+    <!-- Extracurricular Summary (dashboard bottom) -->
+    <section class="extracurricular-dashboard-section glass-panel">
+      <div class="extracurricular-header-row">
+        <h3 class="section-title">My Extracurriculars and Commitments</h3>
+        <button id="add-extracurricular-btn" class="icon-btn" title="Add new activity" onclick="addNewExtracurricular()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+      <div id="extracurricular-summary-container" class="extracurricular-summary">
+        <!-- Populated by renderExtracurricularSummary() -->
+      </div>
+    </section>
   </main>
 
   <!-- Side Drawer Detail Panel (Day details checklist) -->
@@ -401,22 +427,6 @@
           <span class="btn-text">FORCE ROLLOVER // "I didn't finish today"</span>
         </button>
       </div>
-
-      <!-- ⭐ NEW: Extracurricular Summary Section -->
-      <div class="extracurricular-section">
-        <div class="extracurricular-header-row">
-          <h3 class="section-title">EXTRACURRICULARS_&_ACTIVITIES</h3>
-          <button id="add-extracurricular-btn" class="icon-btn" title="Add new activity" onclick="addNewExtracurricular()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
-        </div>
-        <div id="extracurricular-summary-container" class="extracurricular-summary">
-          <!-- Populated by renderExtracurricularSummary() -->
-        </div>
-      </div>
     </div>
   </div>
   
@@ -435,8 +445,14 @@
       </button>
     </div>
     <div class="modal-body">
-      <textarea id="task-notes-textarea" class="notes-textarea" placeholder="Add notes, observations, learnings, blockers, or next steps..."></textarea>
-      <div class="notes-info">Markdown supported • Auto-saves on click Save</div>
+      <div class="notes-field"><label>Notes</label><textarea id="task-notes-text" class="notes-textarea" placeholder="General notes, markdown supported..."></textarea></div>
+      <div class="notes-field"><label>Planned Outcome</label><textarea id="task-notes-planned" class="notes-textarea notes-sm" placeholder="What you planned to accomplish"></textarea></div>
+      <div class="notes-field"><label>Actual Outcome</label><textarea id="task-notes-actual" class="notes-textarea notes-sm" placeholder="What actually happened"></textarea></div>
+      <div class="notes-field"><label>What I Learned</label><textarea id="task-notes-learned" class="notes-textarea notes-sm"></textarea></div>
+      <div class="notes-field"><label>Blockers</label><textarea id="task-notes-blockers" class="notes-textarea notes-sm"></textarea></div>
+      <div class="notes-field"><label>Next Step</label><textarea id="task-notes-next" class="notes-textarea notes-sm"></textarea></div>
+      <div class="notes-field"><label>Links (one per line)</label><textarea id="task-notes-links" class="notes-textarea notes-sm" placeholder="Course, YouTube, GitHub, meeting, lab links..."></textarea></div>
+      <div class="notes-info" id="task-notes-updated">Markdown supported • Click Save to persist</div>
     </div>
     <div class="modal-footer">
       <button id="task-notes-delete-btn" class="btn btn-danger">Delete Notes</button>
@@ -535,13 +551,29 @@
         <!-- Palana Toggle inside settings -->
         <div class="form-group row-group">
           <div class="form-text-block">
-            <label for="settings-palana-toggle">Palana Safety Project (Position Pending)</label>
-            <span class="field-help">Includes 8 hours/week (Mon-Thu 1.5h, Fri 2h). Toggling off deletes/excludes these blocks and frees up scheduled hours.</span>
+            <label for="settings-palana-toggle">Palana Preparation (through June 27)</label>
+            <span class="field-help">Includes detailed onboarding prep tasks June 15–27. Toggling off removes prep blocks.</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="settings-palana-toggle" checked>
             <span class="slider round"></span>
           </label>
+        </div>
+
+        <div class="form-group row-group">
+          <div class="form-text-block">
+            <label for="settings-palana-security-toggle">Activate Palana Security Role</label>
+            <span class="field-help">After June 27: enables ongoing Palana security work (Mon–Fri). Disabled by default.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="settings-palana-security-toggle">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="settings-ahf-weekly">AHF Weekly Hour Target: <span id="val-ahf-weekly">7</span> hours</label>
+          <input type="range" id="settings-ahf-weekly" min="3" max="15" step="0.5" value="7">
         </div>
 
         <!-- Manual Exam Status Toggle Checkboxes -->
@@ -647,16 +679,52 @@
     </div>
   </div>
 
+  </div>
+
+  <!-- Category Manager Modal -->
+  <div id="category-modal" class="modal modal-wide" style="display:none">
+    <div class="modal-header">
+      <h2>MANAGE_CATEGORIES</h2>
+      <button class="close-btn" onclick="document.getElementById('category-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="category-list" class="category-list"></div>
+      <div id="category-edit-panel" class="category-edit-panel" style="display:none">
+        <input type="hidden" id="cat-edit-id">
+        <div class="form-row"><label>Name</label><input id="cat-edit-name" class="form-input"></div>
+        <div class="form-row"><label>Icon</label><input id="cat-edit-icon" class="form-input" maxlength="4"></div>
+        <div class="form-row"><label>Color</label><input type="color" id="cat-edit-color" class="form-input"></div>
+        <div class="form-row"><label>Description</label><input id="cat-edit-desc" class="form-input"></div>
+        <div class="form-row"><label>Weekly hours</label><input type="number" id="cat-edit-weekly" class="form-input" min="0" step="0.5"></div>
+        <div class="form-row"><label>Priority</label><input type="number" id="cat-edit-priority" class="form-input" min="1" max="99"></div>
+        <label class="checkbox-container"><input type="checkbox" id="cat-edit-required"><span class="custom-checkbox"></span>Required</label>
+        <label class="checkbox-container"><input type="checkbox" id="cat-edit-export" checked><span class="custom-checkbox"></span>Include in reports</label>
+        <button class="btn btn-primary" onclick="saveCategoryEdit()">Save Category</button>
+      </div>
+      <hr>
+      <h4>Add New Category</h4>
+      <div class="form-row"><input id="cat-new-name" class="form-input" placeholder="Category name"></div>
+      <div class="form-row"><input id="cat-new-icon" class="form-input" placeholder="Icon (emoji)" maxlength="4" value="✨"></div>
+      <div class="form-row"><input type="color" id="cat-new-color" value="#ffffff"></div>
+      <div class="form-row"><input id="cat-new-desc" class="form-input" placeholder="Description"></div>
+      <div class="form-row"><input type="number" id="cat-new-weekly" class="form-input" placeholder="Weekly hours" min="0" step="0.5" value="0"></div>
+      <div class="form-row"><input type="number" id="cat-new-priority" class="form-input" placeholder="Priority" value="50"></div>
+      <label class="checkbox-container"><input type="checkbox" id="cat-new-required"><span class="custom-checkbox"></span>Required</label>
+      <button class="btn btn-primary" onclick="addNewCategory()">+ Add Category</button>
+    </div>
+  </div>
+
   <!-- Firebase SDK (compat version) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <!-- Script references -->
-  <script src="blind75.js?v=20260613c"></script>
-  <script src="firebase-config.js?v=20260613c"></script>
-  <script src="app.js?v=20260613c"></script>
-  <script src="export.js?v=20260613c"></script>
-  <script src="firebase-sync.js?v=20260613c"></script>
+  <script src="blind75.js?v=20260616"></script>
+  <script src="git-roadmap.js?v=20260616"></script>
+  <script src="firebase-config.js?v=20260616"></script>
+  <script src="app.js?v=20260616"></script>
+  <script src="export.js?v=20260616"></script>
+  <script src="firebase-sync.js?v=20260616"></script>
 </body>
 </html>

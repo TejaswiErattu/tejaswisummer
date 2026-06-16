@@ -74,8 +74,14 @@
   const CAT_LABEL = {
     portswigger: "PortSwigger Labs", aws: "AWS Cloud Practitioner", secplus: "CompTIA Security+",
     projects: "Cybersecurity Projects", leetcode: "LeetCode Blind 75", ahf: "AHF Tech Lead",
-    info310: "INFO 310 Class", palana: "Palana Safety Eng.", github: "GitHub Extension", custom: "Custom"
+    info310: "INFO 310 Class", palana: "Palana Preparation", palana_security: "Palana Security",
+    github: "Git Developer Tool", winfo: "WINFO", mentor: "Mentor Meetings",
+    travel: "Travel", catchup: "Catch-Up", personal: "Personal", custom: "Custom"
   };
+  function catLabel(id) {
+    if (typeof window.getCategoryLabel === "function") return window.getCategoryLabel(id);
+    return CAT_LABEL[id] || id;
+  }
   const ROUTINE_CATS = ["ahf", "leetcode", "info310", "palana", "github", "custom"];
   const OPTIONAL_CATS = ["projects", "github", "palana", "custom"];
 
@@ -103,7 +109,13 @@
 
   // ── Live-state access ──────────────────────────────────────────────────────
   function S() { return (typeof appState !== "undefined" && appState) ? appState : { settings: {}, days: [] }; }
-  function planToday() {
+  function exportPlanToday() {
+    if (typeof window.getRealCurrentDate === "function") {
+      const real = window.getRealCurrentDate();
+      if (real < START) return START;
+      if (real > END) return END;
+      return real;
+    }
     const st = S();
     return (st.settings && st.settings.lastRolloverDay) ? st.settings.lastRolloverDay : START;
   }
@@ -133,7 +145,7 @@
 
   function deriveStatus(t, dayStr) {
     if (t.completed) return "Completed";
-    const today = planToday();
+    const today = exportPlanToday();
     const rolled = /Rolled Over/i.test(t.title || "");
     if (rolled) return "Rescheduled";
     if (dayStr < today) {
@@ -153,7 +165,7 @@
 
   function riskLevel(t, dayStr, status) {
     if (status === "Completed") return "";
-    const today = planToday();
+    const today = exportPlanToday();
     const daysToDeadline = dayDiff(today, END);
     const ri = rescheduleInfo(t, dayStr);
     if (dayStr > END || status === "Overdue" || ri.count >= 2) return "High";
@@ -228,7 +240,7 @@
 
   function dateInScope(dateStr, opt) {
     if (opt.scope === "week") {
-      const w = weekWindow(planToday());
+      const w = weekWindow(exportPlanToday());
       return dateStr >= w.ws && dateStr <= w.we;
     }
     if (opt.scope === "range") {
@@ -261,7 +273,7 @@
         phase: phaseFor(day.date),
         title: t.title,
         cleanTitle: cleanTitle(t.title),
-        category: CAT_LABEL[t.category] || t.category,
+        category: catLabel(t.category),
         rawCat: t.category,
         description: t.title,
         planned: planned,
@@ -361,7 +373,7 @@
     });
     return list.map(q => {
       const s = sched[q.id] || {};
-      const status = s.completed ? "Completed" : (s.day ? (s.day < planToday() ? "Skipped" : (s.day === planToday() ? "In Progress" : "Not Started")) : "Not Started");
+      const status = s.completed ? "Completed" : (s.day ? (s.day < exportPlanToday() ? "Skipped" : (s.day === exportPlanToday() ? "In Progress" : "Not Started")) : "Not Started");
       return {
         _status: status,
         name: q.name, num: q.id, topic: q.category || "", difficulty: difficultyFor(q),
@@ -477,7 +489,7 @@
       if (seen[t.link]) { if (t.completed) seen[t.link].anyDone = true; return; }
       seen[t.link] = { anyDone: t.completed };
       out.push({
-        category: CAT_LABEL[t.category] || t.category,
+        category: catLabel(t.category),
         title: resourceTitleFor(t), description: cleanTitle(t.title),
         url: t.link, related: cleanTitle(t.title),
         _ref: t.link
@@ -519,7 +531,7 @@
     });
 
     const summary = {
-      planStart: START, deadline: END, planToday: planToday(), downloadDate: fmt(new Date()),
+      planStart: START, deadline: END, planToday: exportPlanToday(), downloadDate: fmt(new Date()),
       overallPct: allTaskCount > 0 ? completedCount / allTaskCount : 0,
       totalPlanned, totalCompleted, remaining: round1(totalPlanned - totalCompleted),
       completedCount, unfinishedCount: allTaskCount - completedCount, partialCount: partialGroupCount(),
@@ -928,6 +940,8 @@
       writeMentorMeetings(wb, data);
       writePalanaPrepSummary(wb, data);
       writeAHFTasks(wb, data);
+      writeTaskNotes(wb, data);
+      writeGitProjectRoadmap(wb, data);
       writeSettings(wb);
     }
 
@@ -1011,7 +1025,8 @@
 
   // ⭐ NEW: Export Categories worksheet
   function writeCategories(wb, data) {
-    if (!typeof BUILT_IN_CATEGORIES === "object") return; // Safety check
+    const cats = (typeof window.getAllCategories === "function") ? window.getAllCategories() :
+      (typeof BUILT_IN_CATEGORIES === "object" ? BUILT_IN_CATEGORIES : {});
     writeTable(wb, "Categories", [
       { header: "Category", key: "name", width: 20 },
       { header: "Icon", key: "icon", width: 6 },
@@ -1019,15 +1034,19 @@
       { header: "Weekly Target", key: "target", type: "hours", width: 13 },
       { header: "Priority", key: "priority", type: "int", width: 9 },
       { header: "Required", key: "required", width: 10 },
-      { header: "Description", key: "description", width: 36, wrap: true }
-    ], Object.entries(typeof BUILT_IN_CATEGORIES === "object" ? BUILT_IN_CATEGORIES : {}).map(([id, cat]) => ({
+      { header: "Description", key: "description", width: 36, wrap: true },
+      { header: "Archived", key: "archived", width: 10 },
+      { header: "In Reports", key: "exportEnabled", width: 11 }
+    ], Object.entries(cats).map(([id, cat]) => ({
       name: cat.name || id,
       icon: cat.icon || "✨",
       color: cat.color || "#ffffff",
       target: cat.weeklyTarget || 0,
-      priority: cat.priority || 99,
+      priority: cat.priority || cat.order || 99,
       required: cat.required ? "Yes" : "No",
-      description: cat.description || ""
+      description: cat.description || "",
+      archived: cat.archived ? "Yes" : "No",
+      exportEnabled: cat.exportEnabled !== false ? "Yes" : "No"
     })), { tabColor: "FFE879F9" });
   }
 
@@ -1156,6 +1175,80 @@
       { header: "Status", key: "status", type: "status", width: 12 },
       { header: "✓", key: "completed", width: 5 }
     ], ahfTasks, { tabColor: "FFFF758C", statusKey: "status" });
+  }
+
+  function writeTaskNotes(wb, data) {
+    const notes = S().taskNotes || {};
+    const rows = [];
+    flatTasks().forEach(({ t, day }) => {
+      const n = notes[t.id];
+      if (!n) return;
+      const note = typeof n === "string" ? { text: n } : n;
+      if (!note.text && !note.plannedOutcome && !note.blockers) return;
+      rows.push({
+        task: t.title, date: pd(day.date), category: catLabel(t.category),
+        notes: note.text || "", planned: note.plannedOutcome || "", actual: note.actualOutcome || "",
+        learned: note.learned || "", blockers: note.blockers || "", nextStep: note.nextStep || "",
+        links: note.links || "", updated: note.lastUpdated || ""
+      });
+    });
+    if (rows.length === 0) return;
+    writeTable(wb, "Task Notes", [
+      { header: "Task", key: "task", width: 40, wrap: true },
+      { header: "Date", key: "date", type: "date", width: 12 },
+      { header: "Category", key: "category", width: 18 },
+      { header: "Notes", key: "notes", width: 36, wrap: true },
+      { header: "Planned Outcome", key: "planned", width: 24, wrap: true },
+      { header: "Actual Outcome", key: "actual", width: 24, wrap: true },
+      { header: "Learned", key: "learned", width: 20, wrap: true },
+      { header: "Blockers", key: "blockers", width: 20, wrap: true },
+      { header: "Next Step", key: "nextStep", width: 20, wrap: true },
+      { header: "Links", key: "links", width: 30, wrap: true },
+      { header: "Last Updated", key: "updated", width: 20 }
+    ], rows, { tabColor: "FF94A3B8" });
+  }
+
+  function writeGitProjectRoadmap(wb, data) {
+    const roadmap = (typeof GIT_PROJECT_ROADMAP !== "undefined") ? GIT_PROJECT_ROADMAP : [];
+    if (!roadmap.length) return;
+    const rows = [];
+    roadmap.forEach(w => {
+      w.tasks.forEach(t => {
+        rows.push({
+          week: w.week, label: w.label, task: t.title, owner: t.owner,
+          duration: t.duration, travelFriendly: t.travelFriendly ? "Yes" : "No",
+          deliverables: w.deliverables
+        });
+      });
+    });
+    writeTable(wb, "Git Project Roadmap", [
+      { header: "Week", key: "week", type: "int", width: 7 },
+      { header: "Phase", key: "label", width: 28, wrap: true },
+      { header: "Task", key: "task", width: 44, wrap: true },
+      { header: "Owner", key: "owner", width: 12 },
+      { header: "Hours", key: "duration", type: "hours", width: 9 },
+      { header: "Travel OK", key: "travelFriendly", width: 10 },
+      { header: "Deliverables", key: "deliverables", width: 36, wrap: true }
+    ], rows, { tabColor: "FFFFEA79" });
+
+    const scheduled = [];
+    flatTasks().filter(x => x.t.category === "github").forEach(({ t, day }) => {
+      scheduled.push({
+        date: pd(day.date), title: t.title, owner: t.owner || "",
+        duration: t.duration, status: t.completed ? "Completed" : "Pending",
+        week: t.projectWeek || ""
+      });
+    });
+    if (scheduled.length) {
+      writeTable(wb, "Git Project Ownership", [
+        { header: "Date", key: "date", type: "date", width: 12 },
+        { header: "Task", key: "title", width: 44, wrap: true },
+        { header: "Owner", key: "owner", width: 12 },
+        { header: "Hours", key: "duration", type: "hours", width: 9 },
+        { header: "Week", key: "week", type: "int", width: 7 },
+        { header: "Status", key: "status", type: "status", width: 12 }
+      ], scheduled, { tabColor: "FFFDE047" });
+    }
   }
 
   function writeSettings(wb) {
@@ -1320,7 +1413,7 @@
     let planned = 0, completed = 0;
     rows.forEach(r => { planned += r.planned; completed += r.completed; });
     let dateRange = START + " → " + END;
-    if (opt.scope === "week") { const w = weekWindow(planToday()); dateRange = w.ws + " → " + w.we; }
+    if (opt.scope === "week") { const w = weekWindow(exportPlanToday()); dateRange = w.ws + " → " + w.we; }
     if (opt.scope === "range") dateRange = opt.rangeStart + " → " + opt.rangeEnd;
     return { taskCount: rows.length, dateRange, sheets: sheetNames, planned: round1(planned), completed: round1(completed) };
   }
