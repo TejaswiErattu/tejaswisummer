@@ -13,6 +13,212 @@ const MOTIVATIONAL_QUOTES = [
   "Hackers don't wait for opportunities, they create them in pink! 💻✨"
 ];
 
+// ⭐ NEW: CATEGORY DEFINITIONS with colors, icons, and metadata
+const BUILT_IN_CATEGORIES = {
+  portswigger: {
+    name: "PortSwigger",
+    icon: "🔓",
+    color: "#87f0b5",
+    weeklyTarget: 12,
+    priority: 1,
+    required: true,
+    description: "Web security labs and exercises"
+  },
+  secplus: {
+    name: "CompTIA Security+",
+    icon: "🎓",
+    color: "#a6c0fe",
+    weeklyTarget: 10,
+    priority: 2,
+    required: true,
+    description: "Security certification prep"
+  },
+  aws: {
+    name: "AWS Cloud Practitioner",
+    icon: "☁️",
+    color: "#ffb3a7",
+    weeklyTarget: 6,
+    priority: 3,
+    required: true,
+    description: "AWS certification exam prep"
+  },
+  leetcode: {
+    name: "LeetCode Blind 75",
+    icon: "💻",
+    color: "#c5b3fa",
+    weeklyTarget: 5,
+    priority: 4,
+    required: true,
+    description: "Algorithm and data structure practice"
+  },
+  ahf: {
+    name: "AHF Tech Lead",
+    icon: "👩‍💼",
+    color: "#ff758c",
+    weeklyTarget: 7,
+    priority: 5,
+    required: true,
+    description: "Hopeful Fridays tech leadership"
+  },
+  info310: {
+    name: "INFO 310 Security",
+    icon: "🏫",
+    color: "#8ae9c1",
+    weeklyTarget: 5,
+    priority: 6,
+    required: true,
+    description: "University security course"
+  },
+  palana: {
+    name: "Palana Preparation",
+    icon: "🚀",
+    color: "#ff85a2",
+    weeklyTarget: 0,
+    priority: 7,
+    required: false,
+    description: "Palana onboarding preparation"
+  },
+  github: {
+    name: "Git Developer Tool",
+    icon: "🧑‍💻",
+    color: "#ffea79",
+    weeklyTarget: 8,
+    priority: 8,
+    required: false,
+    description: "VS Code extension project (with Thanishka)"
+  },
+  projects: {
+    name: "Cybersecurity Projects",
+    icon: "🔧",
+    color: "#e2bbfd",
+    weeklyTarget: 0,
+    priority: 9,
+    required: false,
+    description: "Custom security projects and exercises"
+  },
+  winfo: {
+    name: "WINFO",
+    icon: "💰",
+    color: "#90EE90",
+    weeklyTarget: 5,
+    priority: 10,
+    required: false,
+    description: "Women in finance organization"
+  },
+  mentor: {
+    name: "Mentor Meetings",
+    icon: "👨‍🏫",
+    color: "#FFD700",
+    weeklyTarget: 3,
+    priority: 11,
+    required: false,
+    description: "Cybersecurity mentorship sessions"
+  },
+  custom: {
+    name: "Custom",
+    icon: "✨",
+    color: "#ffffff",
+    weeklyTarget: 0,
+    priority: 99,
+    required: false,
+    description: "Custom tasks"
+  }
+};
+
+// ⭐ NEW: EXTRACURRICULAR DEFINITIONS (seed data)
+const BUILT_IN_EXTRACURRICULARS = [
+  {
+    id: "winfo",
+    name: "WINFO",
+    role: "Finance Director",
+    categoryId: "winfo",
+    status: "active",
+    weeklyHours: 5,
+    nextEvent: "TBD",
+    notes: "Women in finance organization"
+  },
+  {
+    id: "ahf",
+    name: "AHF (Hopeful Fridays)",
+    role: "Tech Lead",
+    categoryId: "ahf",
+    status: "active",
+    weeklyHours: 7,
+    nextEvent: "TBD",
+    notes: "Community platform leadership"
+  },
+  {
+    id: "git-project",
+    name: "Git Developer Productivity Tool",
+    role: "Co-developer",
+    categoryId: "github",
+    status: "active",
+    weeklyHours: 8,
+    nextEvent: "TBD",
+    notes: "VS Code extension with Thanishka"
+  },
+  {
+    id: "cybersec-mentor",
+    name: "Cybersecurity Mentorship",
+    role: "Student",
+    categoryId: "mentor",
+    status: "active",
+    weeklyHours: 3,
+    nextEvent: "Monday (weekly meeting with Matt)",
+    notes: "Weekly guidance and lab preparation"
+  },
+  {
+    id: "palana-prep",
+    name: "Palana Preparation",
+    role: "Onboarding",
+    categoryId: "palana",
+    status: "active-through-june-27",
+    weeklyHours: 15,
+    nextEvent: "June 15-27",
+    notes: "Pre-onboarding security engineering preparation"
+  },
+  {
+    id: "info310",
+    name: "INFO 310 (Security)",
+    role: "Student",
+    categoryId: "info310",
+    status: "active-through-aug-21",
+    weeklyHours: 5,
+    nextEvent: "June 22 - Aug 21",
+    notes: "University security course"
+  },
+  {
+    id: "leetcode",
+    name: "LeetCode 75",
+    role: "Practitioner",
+    categoryId: "leetcode",
+    status: "active",
+    weeklyHours: 5,
+    nextEvent: "Daily (1 problem/day)",
+    notes: "Algorithm problem solving"
+  },
+  {
+    id: "secplus",
+    name: "CompTIA Security+",
+    role: "Exam Candidate",
+    categoryId: "secplus",
+    status: "active",
+    weeklyHours: 10,
+    nextEvent: "Target: Aug 18-22",
+    notes: "Certification exam prep"
+  },
+  {
+    id: "aws",
+    name: "AWS Cloud Practitioner",
+    role: "Exam Candidate",
+    categoryId: "aws",
+    status: "active-until-passed",
+    weeklyHours: 6,
+    nextEvent: "Target: June 23",
+    notes: "Certification exam prep"
+  }
+];
+
 // 2. PROJECT TASK MODULES (TRACK 4)
 const TRACK_4_PROJECTS = [
   {
@@ -153,9 +359,14 @@ let appState = {
     securityPlusExamPassed: false,
     selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"], // default projects
     lastRolloverDay: null, // date string representing the last day forced rollover
-    scheduleVersion: SCHEDULE_VERSION
+    scheduleVersion: SCHEDULE_VERSION,
+    palanaSecurityEnabled: false, // ⭐ NEW: Palana Security role (disabled until June 27)
+    ahfWeeklyTarget: 7 // ⭐ NEW: AHF weekly hours (editable)
   },
-  days: [] // array of all days
+  days: [], // array of all days
+  categories: {}, // ⭐ NEW: Custom category storage
+  extracurriculars: [], // ⭐ NEW: Extracurricular tracking
+  rescheduleLedger: {} // Track reschedule history
 };
 
 // Date constants
@@ -169,6 +380,129 @@ const INFO_END_STR = "2026-08-21";
 // Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
 // front-loaded into the lead-up window (plan start → day before onboarding).
 const PALANA_ONBOARDING_STR = "2026-06-27";
+
+// ⭐ NEW: DETAILED PALANA PREPARATION TASKS (June 15-27)
+const PALANA_PREP_TASKS_DETAILED = {
+  "2026-06-15": [ // Sunday - Organize and begin threat modeling
+    { title: "Create Palana security workspace (sections: meeting notes, architecture, threat model, findings, questions, weekly updates)", duration: 0.75, time: 45 },
+    { title: "Write down known Palana technology stack (React Native, Expo, Go, Firebase, Google Cloud, Railway, Next.js, WebSockets)", duration: 0.33, time: 20 },
+    { title: "Begin cybersecurity threat-modeling course (3.5 hour total across week - schedule first section today)", duration: 1.0, time: 60 }
+  ],
+  "2026-06-16": [ // Monday - Security foundations and assets
+    { title: "Weekly cybersecurity mentor meeting with Matt", duration: 1.0, time: 60, recurring: "Monday" },
+    { title: "Continue threat-modeling course (review: CIA, assets, threats, vulnerabilities, risk, controls)", duration: 1.0, time: 60 },
+    { title: "Create Palana asset inventory (rider location, pickup/destination, ride history, email, driver info, tokens, admin accounts, Firebase, API credentials, logs; document: impact if exposed/changed/unavailable)", duration: 1.5, time: 90 }
+  ],
+  "2026-06-17": [ // Tuesday - Finish threat modeling and begin threat register
+    { title: "Finish remaining cybersecurity threat-modeling course", duration: 1.5, time: 90 },
+    { title: "Review four core threat-modeling questions (What are we building? What can go wrong? What are we doing about it? Did we do enough?)", duration: 0.5, time: 30 },
+    { title: "Create Threat Register Version 0.1 (component, asset, threat, impact, likelihood, risk, mitigation) with at least 5 initial threats (examples: rider accesses another rider's trip, user changes role to driver, location data stored too long, WebSocket exposes updates, repeated requests overwhelm queue)", duration: 1.0, time: 60 }
+  ],
+  "2026-06-18": [ // Wednesday - Architecture and data flow analysis
+    { title: "Watch cybersecurity videos provided by Matt (add notes field for video links, allow multiple resources)", duration: 1.0, time: 60 },
+    { title: "Create Draft Palana Data-Flow Diagram Version 0.1 (include: rider, React/Expo, Go API, Railway, Firebase, Google Cloud, driver interface, admin interface, Next.js, WebSockets, authentication, external services, user devices; mark trust boundaries)", duration: 1.0, time: 60 }
+  ],
+  "2026-06-19": [ // Thursday - STRIDE and structured threat analysis
+    { title: "Study STRIDE methodology (Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege)", duration: 1.0, time: 60 },
+    { title: "Apply STRIDE to Palana's ride-request flow (write at least 2 threats for each category)", duration: 1.0, time: 60 },
+    { title: "Complete PortSwigger-related threat analysis (attach lab/article link, record: vulnerable flow, likely attack, possible mitigation)", duration: 0.5, time: 30 }
+  ],
+  "2026-06-20": [ // Friday - Firebase authorization review
+    { title: "Review Firebase security fundamentals (authentication vs authorization, request.auth, user ownership, role-based access, deny-by-default, data validation, Firestore rules, Storage rules, Firebase Emulator Suite)", duration: 1.5, time: 90 },
+    { title: "Create Firebase review checklist (Can users read only their own? Can rider edit another's trip? Can users write unexpected fields? Can user assign themselves admin? Are rules in GitHub? Are automated tests available? Does Admin SDK bypass client-side rules?)", duration: 0.75, time: 45 }
+  ],
+  "2026-06-21": [ // Saturday - Weekly review and mentor preparation
+    { title: "Review week's notes and clean up DFD", duration: 0.75, time: 45 },
+    { title: "Clean up threat register", duration: 0.5, time: 30 },
+    { title: "Complete beginner Firebase or access-control exercise", duration: 0.5, time: 30 },
+    { title: "Complete labs/preparation for Monday meeting with Matt", duration: 0.5, time: 30 },
+    { title: "Write down questions for Matt", duration: 0.25, time: 15 },
+    { title: "Create Week 1 summary", duration: 0.5, time: 30 }
+  ],
+  "2026-06-22": [ // Sunday - Week 2: Authorization and access control
+    { title: "Weekly meeting with Matt", duration: 1.0, time: 60 },
+    { title: "Study broken access control and IDOR (Insecure Direct Object References)", duration: 1.0, time: 60 },
+    { title: "Create authorization test plan with at least 10 tests (rider views/cancels another's trip, accesses driver info, performs admin action, changed ID exposes record, logged-out user accesses data, deleted token still works, subscribes to another's WebSocket, client changes role, accesses location history)", duration: 1.0, time: 60 }
+  ],
+  "2026-06-23": [ // Monday - Burp Suite and request manipulation
+    { title: "Practice with Burp Suite (proxy, HTTP history, Repeater, modifying IDs/headers, removing auth tokens, comparing accounts, repeating requests, inspecting data)", duration: 1.5, time: 90 },
+    { title: "Complete at least one PortSwigger access-control lab (record: request changed, expected result, actual result, security impact, mitigation, lab link)", duration: 0.5, time: 30 }
+  ],
+  "2026-06-24": [ // Tuesday - Travel day (INDIA_TRIP starts)
+    { title: "Save notes for offline access", duration: 0.25, time: 15 },
+    { title: "Download diagrams", duration: 0.1, time: 6 },
+    { title: "Save onboarding questions", duration: 0.1, time: 6 },
+    { title: "Review CIA and STRIDE if convenient", duration: 0.1, time: 6 }
+  ],
+  "2026-06-25": [ // Wednesday - Writing professional findings
+    { title: "Create finding template (title, severity, affected component, summary, preconditions, reproduction steps, expected/actual behavior, evidence, security impact, remediation, retesting, assigned developer, status)", duration: 0.75, time: 45 },
+    { title: "Create sample finding: 'Rider can access another rider's active trip by changing the ride ID'", duration: 0.25, time: 15 }
+  ],
+  "2026-06-26": [ // Thursday - Onboarding preparation
+    { title: "Organize questions into categories (data/privacy, architecture, auth, Firebase/backend, permissions testing, finding reporting)", duration: 0.5, time: 30 },
+    { title: "Choose top 12 questions to ask", duration: 0.25, time: 15 },
+    { title: "Create vulnerability-searching checklist (broken access control, auth flaws, role escalation, Firebase rules, API auth, input validation, data exposure, WebSocket auth, rate limiting, logging, secrets, location privacy, data retention, error messages, abuse cases)", duration: 0.25, time: 15 },
+    { title: "Prepare short introduction for onboarding", duration: 0.2, time: 12 }
+  ],
+  "2026-06-27": [ // Friday - Palana onboarding day
+    { title: "Attend Palana onboarding", duration: 2.0, time: 120 },
+    { title: "Ask for: architecture docs, database schema, Firebase products used, repo access, staging/test environment, role-based test accounts, issue-tracker access, existing security findings", duration: 0.5, time: 30 },
+    { title: "Confirm testing boundaries and prohibition on production testing", duration: 0.25, time: 15 },
+    { title: "Confirm reporting and severity process", duration: 0.25, time: 15 },
+    { title: "Write immediate onboarding notes", duration: 0.75, time: 45 }
+  ],
+  "2026-06-28": [ // Saturday - Optional follow-up (after onboarding weekend)
+    { title: "Organize onboarding notes (optional light follow-up)", duration: 0.75, time: 45 },
+    { title: "Record access received", duration: 0.25, time: 15 },
+    { title: "Record missing access", duration: 0.25, time: 15 },
+    { title: "List first three likely tasks", duration: 0.5, time: 30 },
+    { title: "Decide whether to activate Palana Security Role category", duration: 0.25, time: 15 }
+  ]
+};
+
+// ⭐ NEW: DETAILED AHF TASKS (June 15-July 26)
+const AHF_TASKS_DETAILED = {
+  "2026-06-15": [
+    { title: "Log in to AHF Microsoft 365", duration: 0.1, time: 6 },
+    { title: "Find Outlook Scheduling Poll", duration: 0.1, time: 6 },
+    { title: "Confirm access: GoHighLevel, Microsoft Planner, Teams, GitHub", duration: 0.25, time: 15 },
+    { title: "Create 'AHF Summer Tasks and Findings' document (sections: GHL workflows, task mgmt, website/GitHub, Rahul questions, Danny questions)", duration: 0.5, time: 30 },
+    { title: "List missing access and send Rahul one consolidated permissions message", duration: 0.5, time: 30 }
+  ],
+  "2026-06-16": [
+    { title: "Create one-hour Saturday scheduling poll (Danny, Rahul, Roslyn, Cale, Tejaswi, Patricia; Pacific afternoon options)", duration: 1.0, time: 60 },
+    { title: "Mark existing tasks as: unclear, duplicate, outdated, missing owner, or needs leadership decision", duration: 0.75, time: 45 }
+  ],
+  "2026-06-17": [
+    { title: "Understand GoHighLevel workflows (record for each: name, trigger, entry criteria, email frequency, wait steps, conditions, sender, recipient group, repetition, Corey dependency, reply behavior, exit condition; take screenshots)", duration: 1.5, time: 90 }
+  ],
+  "2026-06-18": [
+    { title: "Create TEST workflow: Tejaswi Recurring Email (test daily + weekly recurring, easy stop condition, clear labels, don't affect real members)", duration: 1.0, time: 60 }
+  ],
+  "2026-06-19": [
+    { title: "Create Hopeful Fridays – Planner POC (buckets: leadership decisions, website/portal, technology, operations, communications, completed)", duration: 1.0, time: 60 },
+    { title: "Test Planner features: assignment, due dates, labels, checklists, comments, attachments, Teams view, GitHub links, notifications", duration: 0.75, time: 45 }
+  ],
+  "2026-06-20": [
+    { title: "Leadership meeting on: community platform vs member portal, GHL temporary status, website updates location, new website approval, WordPress pre-alpha, account ownership, priorities before India", duration: 1.5, time: 90 },
+    { title: "Record: decisions, open questions, owners, deadlines, approved priorities", duration: 0.5, time: 30 }
+  ],
+  "2026-06-21": [
+    { title: "Clean notes and send recap if needed", duration: 0.5, time: 30 },
+    { title: "Check GHL test emails and update task document", duration: 0.5, time: 30 },
+    { title: "Select next three priorities", duration: 0.25, time: 15 }
+  ],
+  "2026-06-22": [
+    { title: "Create Hopeful Fridays – Trello POC (test: boards/lists, assignments, labels, due dates, GitHub links, PR attachments, Teams, automation, updates)", duration: 1.5, time: 90 },
+    { title: "Compare Planner vs Trello", duration: 0.5, time: 30 }
+  ],
+  "2026-06-23": [
+    { title: "Create pre-travel handoff status update (poll/meeting status, GHL findings, email test results, Planner findings, Trello findings, missing permissions, decisions needed, recommended next step)", duration: 1.0, time: 60 },
+    { title: "Save documents in AHF-controlled location and share access", duration: 0.5, time: 30 },
+    { title: "Turn off test workflows and mark incomplete work", duration: 0.5, time: 30 }
+  ]
+};
+
 const PALANA_PREP_TASKS = [
   "Palana Prep: Company mission, safety domain & product deep-dive",
   "Palana Prep: Set up dev environment, accounts & onboarding tooling",
@@ -207,6 +541,33 @@ function getDayOfWeek(dateStr) {
   return date.getDay(); // 0 = Sunday, 1 = Monday, etc.
 }
 
+// ⭐ NEW: Get the real current date in America/Los_Angeles timezone
+function getRealCurrentDate() {
+  // Get current date in browser's local timezone
+  const now = new Date();
+  
+  // Convert to LA timezone using Intl API (timezone-aware)
+  const laFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  const parts = laFormatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  
+  return `${year}-${month}-${day}`;
+}
+
+// ⭐ NEW: Get real current date as Date object (midnight LA time)
+function getRealCurrentDateObj() {
+  const dateStr = getRealCurrentDate();
+  return parseDate(dateStr);
+}
+
 function isIndiaTrip(dateStr) {
   return dateStr >= INDIA_START_STR && dateStr <= INDIA_END_STR;
 }
@@ -216,6 +577,66 @@ function isInfo310Class(dateStr) {
 }
 
 // True during the Palana onboarding lead-up window (plan start → day before onboarding).
+// ⭐ NEW: Helper function to build AHF tasks for a day
+function buildAHFTasksForDay(dateStr) {
+  // Use detailed tasks if available for June 15-23 period
+  if (dateStr in AHF_TASKS_DETAILED) {
+    const tasksForDay = AHF_TASKS_DETAILED[dateStr];
+    return tasksForDay.map((task, index) => ({
+      id: `${dateStr}_ahf_${index}`,
+      category: "ahf",
+      title: task.title,
+      duration: task.duration,
+      completed: false,
+      link: null
+    }));
+  }
+  
+  // Default: 1-hour AHF tech lead work for other days
+  return [{
+    id: `${dateStr}_ahf`,
+    category: "ahf",
+    title: "AHF Work (Tech Lead Duties)",
+    duration: 1.0,
+    completed: false,
+    link: null
+  }];
+}
+
+// ⭐ NEW: Helper function to build recurring mentor meetings
+function buildMentorTasksForDay(dateStr) {
+  const tasks = [];
+  const dayOfWeek = getDayOfWeek(dateStr);
+  
+  // Every Monday: Weekly meeting with Matt (1 hour)
+  if (dayOfWeek === 1) {
+    tasks.push({
+      id: `${dateStr}_mentor_meeting`,
+      category: "mentor",
+      title: "Weekly Mentor Meeting with Matt",
+      duration: 1.0,
+      completed: false,
+      recurring: "weekly-monday",
+      link: null
+    });
+  }
+  
+  // Every Sunday: Mentor Lab Preparation (1 hour)
+  if (dayOfWeek === 0) {
+    tasks.push({
+      id: `${dateStr}_mentor_prep`,
+      category: "mentor",
+      title: "Mentor Lab Preparation (prep for Monday meeting)",
+      duration: 1.0,
+      completed: false,
+      recurring: "weekly-sunday",
+      link: null
+    });
+  }
+  
+  return tasks;
+}
+
 function isPalanaPrepWindow(dateStr) {
   return dateStr >= START_DATE_STR && dateStr < PALANA_ONBOARDING_STR;
 }
@@ -224,8 +645,23 @@ function isPalanaPrepWindow(dateStr) {
 // Before onboarding: intensive daily "Palana Onboarding Prep" blocks.
 // After onboarding: regular weekday safety-engineering work blocks.
 function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
-  if (!appState.settings.palanaEnabled) return null;
-  if (isIndia) return null; // India trip is capacity-capped; no Palana blocks
+  if (!appState.settings.palanaEnabled) return [];
+  if (isIndia) return []; // India trip is capacity-capped; no Palana blocks
+
+  // ⭐ NEW: Use detailed tasks if available (June 15-27), otherwise generic
+  if (dateStr in PALANA_PREP_TASKS_DETAILED) {
+    const tasksForDay = PALANA_PREP_TASKS_DETAILED[dateStr];
+    return tasksForDay.map((task, index) => ({
+      id: `${dateStr}_palana_${index}`,
+      category: "palana",
+      title: task.title,
+      duration: task.duration,
+      completed: false,
+      fixed: true, // Don't reschedule Palana prep tasks
+      recurring: task.recurring || false,
+      link: null
+    }));
+  }
 
   if (isPalanaPrepWindow(dateStr)) {
     // Intensive onboarding prep — front-loaded before the job starts.
@@ -235,29 +671,29 @@ function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
     else hours = 3.0;                         // Weekday — intensive
     const offset = getDaysBetween(START_DATE_STR, dateStr);
     const title = PALANA_PREP_TASKS[offset % PALANA_PREP_TASKS.length];
-    return {
+    return [{
       id: `${dateStr}_palana`,
       category: "palana",
       title: `🚀 ${title}`,
       duration: hours,
       completed: false,
       link: null
-    };
+    }];
   }
 
   // Regular Palana work after onboarding (weekdays only): Mon-Thu 1.5h, Fri 2h.
   if (dayOfWeek >= 1 && dayOfWeek <= 5) {
     const palanaHours = (dayOfWeek === 5) ? 2.0 : 1.5;
-    return {
+    return [{
       id: `${dateStr}_palana`,
       category: "palana",
       title: "Palana Work (Safety Engineering)",
       duration: palanaHours,
       completed: false,
       link: null
-    };
+    }];
   }
-  return null;
+  return [];
 }
 
 // Check if a day is a rest day (for capacity variation)
@@ -305,14 +741,10 @@ function generateBaseSchedule() {
     };
     
     // Add Routines for this day
-    // 1. AHF Tech Lead Work (1h every single day, no exceptions)
-    dayObj.tasks.push({
-      id: `${dateStr}_ahf`,
-      category: "ahf",
-      title: "AHF Work (Tech Lead Duties)",
-      duration: 1.0,
-      completed: false,
-      link: null
+    // 1. AHF Tech Lead Work (1h base + detailed tasks June 15-23)
+    const ahfTasks = buildAHFTasksForDay(dateStr);
+    ahfTasks.forEach(task => {
+      dayObj.tasks.push(task);
     });
     
     // 2. LeetCode (1 problem/day, daily, ~0.5h)
@@ -343,10 +775,10 @@ function generateBaseSchedule() {
 
     // 4. Palana — intensive onboarding prep before the job starts (week of June 27),
     //    then regular safety-engineering work blocks afterwards.
-    const palanaTask = buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia);
-    if (palanaTask) {
-      dayObj.tasks.push(palanaTask);
-    }
+    const palanaTasks = buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia);
+    palanaTasks.forEach(task => {
+      dayObj.tasks.push(task);
+    });
 
     // 5. GitHub Extension Passion Project (2 hours/week, Saturday preferred, unless on India Trip).
     //    Paused on Palana-prep Saturdays so the day stays within capacity for job prep.
@@ -361,49 +793,28 @@ function generateBaseSchedule() {
       });
     }
 
+    // 6. ⭐ NEW: Mentor Meetings (recurring: Monday + Sunday prep)
+    const mentorTasks = buildMentorTasksForDay(dateStr);
+    mentorTasks.forEach(task => {
+      dayObj.tasks.push(task);
+    });
+
     daysList.push(dayObj);
     current.setDate(current.getDate() + 1);
   }
 
-  // Assign exact LeetCode questions from BLIND_75_QUESTIONS array (excluding Sundays)
+  // ⭐ UPDATED: Assign exact LeetCode questions from BLIND_75_QUESTIONS array (1 per day, including Sundays)
   let lcIndex = 0;
   for (let i = 0; i < daysList.length; i++) {
     const day = daysList[i];
-    const dayOfWeek = getDayOfWeek(day.date);
     const lcTask = day.tasks.find(t => t.category === "leetcode");
     
-    // Standard rule: 1 per day. On rest days (Sunday) we can skip it, and do 2 on Monday (or next day)
-    // Let's make LeetCode skipped on Sundays, and schedule 2 problems on Monday!
-    if (dayOfWeek === 0) {
-      // Skip on Sunday! Remove the task or set duration to 0. Let's just remove the task block.
-      day.tasks = day.tasks.filter(t => t.category !== "leetcode");
-    } else {
-      // Weekday / Saturday
-      if (dayOfWeek === 1 && lcIndex > 0) {
-        // Monday: Schedule 2 problems (Sunday rollover built-in)
-        lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex % 75].id} - ${BLIND_75_QUESTIONS[lcIndex % 75].name}`;
-        lcTask.link = BLIND_75_QUESTIONS[lcIndex % 75].link;
-        lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex % 75].id;
-        lcIndex++;
-        
-        // Add second LeetCode task for Monday
-        day.tasks.push({
-          id: `${day.date}_leetcode_2`,
-          category: "leetcode",
-          title: `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex % 75].id} - ${BLIND_75_QUESTIONS[lcIndex % 75].name}`,
-          duration: 0.5,
-          completed: false,
-          link: BLIND_75_QUESTIONS[lcIndex % 75].link,
-          leetcodeId: BLIND_75_QUESTIONS[lcIndex % 75].id
-        });
-        lcIndex++;
-      } else {
-        // Standard Day: Schedule 1 problem
-        lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex % 75].id} - ${BLIND_75_QUESTIONS[lcIndex % 75].name}`;
-        lcTask.link = BLIND_75_QUESTIONS[lcIndex % 75].link;
-        lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex % 75].id;
-        lcIndex++;
-      }
+    if (lcTask) {
+      // Schedule exactly 1 LeetCode problem per day (including Sunday)
+      lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex % 75].id} - ${BLIND_75_QUESTIONS[lcIndex % 75].name}`;
+      lcTask.link = BLIND_75_QUESTIONS[lcIndex % 75].link;
+      lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex % 75].id;
+      lcIndex++;
     }
   }
 
@@ -944,7 +1355,183 @@ function reflowRemainingCurriculum() {
   initUI();
 }
 
-// 9. LOCAL STORAGE PERSISTENCE
+// 9. LOCAL STORAGE PERSISTENCE & MIGRATION
+// ⭐ NEW: Task Notes System Functions
+function initializeTaskNotes() {
+  if (!appState.taskNotes) appState.taskNotes = {};
+}
+
+function getTaskNotes(taskId) {
+  initializeTaskNotes();
+  return appState.taskNotes[taskId] || { text: "", lastUpdated: null };
+}
+
+function saveTaskNote(taskId, text) {
+  initializeTaskNotes();
+  appState.taskNotes[taskId] = {
+    text: text,
+    lastUpdated: new Date().toISOString()
+  };
+  saveState();
+}
+
+function deleteTaskNote(taskId) {
+  if (appState.taskNotes) delete appState.taskNotes[taskId];
+  saveState();
+}
+
+// ⭐ NEW: Render Task Notes Modal
+function showTaskNotesModal(taskId, taskTitle) {
+  const notes = getTaskNotes(taskId);
+  const modal = document.getElementById("task-notes-modal");
+  const textarea = document.getElementById("task-notes-textarea");
+  const modalTitle = document.getElementById("task-notes-modal-title");
+  const saveBtn = document.getElementById("task-notes-save-btn");
+  const deleteBtn = document.getElementById("task-notes-delete-btn");
+  
+  modalTitle.textContent = `Notes: ${taskTitle}`;
+  textarea.value = notes.text || "";
+  
+  saveBtn.onclick = () => {
+    saveTaskNote(taskId, textarea.value);
+    modal.style.display = "none";
+    playSynthSound("success");
+    renderDashboard();
+  };
+  
+  deleteBtn.onclick = () => {
+    if (confirm("Delete notes for this task?")) {
+      deleteTaskNote(taskId);
+      modal.style.display = "none";
+      playSynthSound("click");
+      renderDashboard();
+    }
+  };
+  
+  modal.style.display = "flex";
+}
+
+// ⭐ NEW: Extracurricular Summary Rendering
+function renderExtracurricularSummary() {
+  const container = document.getElementById("extracurricular-summary-container");
+  if (!container) return;
+  
+  if (!appState.extracurriculars || appState.extracurriculars.length === 0) {
+    container.innerHTML = `
+      <div class="extracurricular-card empty">
+        <p>No extracurriculars added yet. Create one to get started!</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = appState.extracurriculars.map((ec, idx) => {
+    const categoryDef = BUILT_IN_CATEGORIES[ec.categoryId];
+    const icon = categoryDef ? categoryDef.icon : "✨";
+    const color = categoryDef ? categoryDef.color : "#ffffff";
+    
+    return `
+      <div class="extracurricular-card" style="border-left: 4px solid ${color}">
+        <div class="extracurricular-header">
+          <span class="extracurricular-icon">${icon}</span>
+          <div class="extracurricular-titles">
+            <div class="extracurricular-name">${ec.name}</div>
+            <div class="extracurricular-role">${ec.role}</div>
+          </div>
+          <span class="extracurricular-status ${ec.status}">${ec.status.replace("-", " ")}</span>
+        </div>
+        <div class="extracurricular-details">
+          <div class="detail-row">
+            <span class="detail-label">Weekly Hours:</span>
+            <span class="detail-value">${ec.weeklyHours}h</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Next Event:</span>
+            <span class="detail-value">${ec.nextEvent}</span>
+          </div>
+          ${ec.notes ? `<div class="detail-row"><span class="detail-value notes">${ec.notes}</span></div>` : ''}
+        </div>
+        <div class="extracurricular-actions">
+          <button class="action-btn edit-btn" onclick="editExtracurricular(${idx})">Edit</button>
+          <button class="action-btn delete-btn" onclick="deleteExtracurricular(${idx})">Remove</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editExtracurricular(idx) {
+  const ec = appState.extracurriculars[idx];
+  const modal = document.getElementById("extracurricular-modal");
+  const form = document.getElementById("extracurricular-form");
+  
+  document.getElementById("ec-name").value = ec.name;
+  document.getElementById("ec-role").value = ec.role;
+  document.getElementById("ec-category").value = ec.categoryId;
+  document.getElementById("ec-status").value = ec.status;
+  document.getElementById("ec-weeklyHours").value = ec.weeklyHours;
+  document.getElementById("ec-nextEvent").value = ec.nextEvent;
+  document.getElementById("ec-notes").value = ec.notes || "";
+  
+  document.getElementById("ec-save-btn").onclick = () => {
+    appState.extracurriculars[idx] = {
+      id: ec.id,
+      name: document.getElementById("ec-name").value,
+      role: document.getElementById("ec-role").value,
+      categoryId: document.getElementById("ec-category").value,
+      status: document.getElementById("ec-status").value,
+      weeklyHours: parseFloat(document.getElementById("ec-weeklyHours").value) || 0,
+      nextEvent: document.getElementById("ec-nextEvent").value,
+      notes: document.getElementById("ec-notes").value
+    };
+    saveState();
+    modal.style.display = "none";
+    renderExtracurricularSummary();
+    playSynthSound("success");
+  };
+  
+  modal.style.display = "flex";
+}
+
+function deleteExtracurricular(idx) {
+  if (confirm("Remove this extracurricular?")) {
+    appState.extracurriculars.splice(idx, 1);
+    saveState();
+    renderExtracurricularSummary();
+    playSynthSound("click");
+  }
+}
+
+function addNewExtracurricular() {
+  const modal = document.getElementById("extracurricular-modal");
+  document.getElementById("extracurricular-form").reset();
+  document.getElementById("ec-status").value = "active";
+  
+  document.getElementById("ec-save-btn").onclick = () => {
+    const newEc = {
+      id: `ec_${Date.now()}`,
+      name: document.getElementById("ec-name").value,
+      role: document.getElementById("ec-role").value,
+      categoryId: document.getElementById("ec-category").value,
+      status: document.getElementById("ec-status").value,
+      weeklyHours: parseFloat(document.getElementById("ec-weeklyHours").value) || 0,
+      nextEvent: document.getElementById("ec-nextEvent").value,
+      notes: document.getElementById("ec-notes").value
+    };
+    if (newEc.name && newEc.role) {
+      appState.extracurriculars.push(newEc);
+      saveState();
+      modal.style.display = "none";
+      renderExtracurricularSummary();
+      playSynthSound("success");
+    } else {
+      alert("Please fill in Name and Role");
+    }
+  };
+  
+  modal.style.display = "flex";
+}
+
 function saveState() {
   localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
   // Also sync to Firebase cloud if user is signed in
@@ -962,6 +1549,8 @@ function loadState() {
       if (!appState.days || appState.days.length === 0) {
         generateNewState();
       }
+      // ⭐ NEW: Migrate from simulated today to real today
+      migrateToRealCurrentDate();
     } catch (e) {
       console.error("Failed to parse state, generating new.", e);
       generateNewState();
@@ -974,6 +1563,26 @@ function loadState() {
 function generateNewState() {
   generateBaseSchedule();
   saveState();
+}
+
+// ⭐ NEW: Migrate from simulated "today" to real browser current date
+// This preserves all completed tasks while updating which day is considered "today"
+function migrateToRealCurrentDate() {
+  // Check if we already migrated (v2.1 or higher)
+  if (!appState.settings) return;
+  
+  const realToday = getRealCurrentDate();
+  const oldSimulatedToday = appState.settings.lastRolloverDay || START_DATE_STR;
+  
+  // Only migrate if the real today is AFTER the old simulated today
+  if (realToday > oldSimulatedToday) {
+    console.log(`[Migration] Real today (${realToday}) is after simulated today (${oldSimulatedToday}). Updating...`);
+    
+    // Simply update the "today" marker to real today
+    // Completed tasks are already preserved in their day objects
+    appState.settings.lastRolloverDay = realToday;
+    saveState();
+  }
 }
 
 // Upgrades an older saved schedule (local or cloud) to the current SCHEDULE_VERSION.
@@ -1099,13 +1708,23 @@ let activeMonth = "2026-06"; // Current calendar viewing month
 let selectedDate = null;     // Date open in side drawer
 
 function initUI() {
+  initializeExtracurriculars();
   renderDashboardMetrics();
   renderProjectSelector();
   renderCalendarMonthControls();
   renderCalendarDays();
   renderTracksChecklists();
+  renderExtracurricularSummary();
   updateRiskBanner();
   cycleQuotes();
+}
+
+// ⭐ NEW: Initialize extracurriculars with seed data on first load
+function initializeExtracurriculars() {
+  if (!appState.extracurriculars || appState.extracurriculars.length === 0) {
+    appState.extracurriculars = [...BUILT_IN_EXTRACURRICULARS];
+    saveState();
+  }
 }
 
 // Overall Stats calculations
@@ -1150,16 +1769,15 @@ function renderDashboardMetrics() {
   // Sort days chronologically
   const sortedDays = [...appState.days].sort((a, b) => a.date.localeCompare(b.date));
 
-  // Determine the simulated "today" boundary — only count days up to and including today
-  // to prevent future incomplete days from resetting the streak.
-  let simulatedTodayStr = appState.settings.lastRolloverDay || START_DATE_STR;
+  // ⭐ NEW: Use real browser date (America/Los_Angeles timezone), not simulated
+  let realTodayStr = getRealCurrentDate();
 
   // We calculate streak based on days that have tasks and ALL tasks are completed
   // (or at least 1 task was completed and nothing left unchecked)
   for (let i = 0; i < sortedDays.length; i++) {
     const day = sortedDays[i];
-    // Only count days up to and including simulated today
-    if (day.date > simulatedTodayStr) break;
+    // Only count days up to and including real today (NOT simulated today)
+    if (day.date > realTodayStr) break;
     // Check if day has tasks
     if (day.tasks.length > 0) {
       const allDone = day.tasks.every(t => t.completed);
@@ -1183,15 +1801,10 @@ function renderDashboardMetrics() {
   document.getElementById("metric-completion-sub").innerText = `${completedTasks} / ${totalTasks} Tasks Completed`;
   
   // Countdown to Sept 1, 2026
-  // Note: Today's date is simulated. Since this is a 2026 study plan, let's treat the date as active.
-  // If we are currently in 2026 (local time), the study plan has completed, but let's mock the "current" study date.
-  // Let's assume the simulated current date is the first day of the plan June 13, 2026 or the last rolled-over day.
-  let simulatedToday = parseDate(START_DATE_STR);
-  if (appState.settings.lastRolloverDay) {
-    simulatedToday = parseDate(appState.settings.lastRolloverDay);
-  }
+  // ⭐ NEW: Use real browser date (America/Los_Angeles timezone), not simulated
+  let realToday = getRealCurrentDateObj();
   const endPlanDate = parseDate(END_DATE_STR);
-  const diffTime = endPlanDate - simulatedToday;
+  const diffTime = endPlanDate - realToday;
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   document.getElementById("metric-countdown").innerText = `${daysLeft} days`;
 
@@ -1343,9 +1956,9 @@ function renderCalendarDays() {
     const dayCell = document.createElement("div");
     dayCell.className = "day-cell";
     
-    // Highlight today (simulated: last rollover day, or plan start if no rollover yet)
-    const simulatedTodayDate = appState.settings.lastRolloverDay || START_DATE_STR;
-    const isToday = simulatedTodayDate === day.date;
+    // ⭐ NEW: Highlight real current day (using browser's real date, not simulated)
+    const realTodayDate = getRealCurrentDate();
+    const isToday = realTodayDate === day.date;
     if (isToday) {
       dayCell.classList.add("today-cell");
     }
@@ -1473,21 +2086,34 @@ function showDayDetails(dateStr) {
         ? `<button class="task-delete-btn" title="Delete task">✕</button>`
         : '';
       
+      // ⭐ NEW: Check if task has notes
+      const taskNotes = getTaskNotes(task.id);
+      const hasNotes = taskNotes && taskNotes.text;
+      const notesIndicator = hasNotes ? `<span class="task-notes-indicator" title="Has notes">📝</span>` : '';
+      const notesBtn = `<button class="task-notes-btn" title="Edit notes">📝</button>`;
+      
       itemRow.innerHTML = `
         <label class="checkbox-container">
           <input type="checkbox" ${task.completed ? 'checked' : ''}>
           <span class="custom-checkbox"></span>
         </label>
         <div class="task-details">
-          <span class="task-label">${task.title}</span>
+          <span class="task-label">${task.title}${notesIndicator}</span>
           <div class="task-sub-meta">
             <span class="task-cat-badge badge-${task.category}">${task.category}</span>
             <span>Est: ${task.duration} hr${task.duration > 1 ? 's' : ''}</span>
           </div>
         </div>
         ${linkHtml}
+        ${notesBtn}
         ${deleteHtml}
       `;
+
+      // Notes button listener
+      itemRow.querySelector('.task-notes-btn').addEventListener('click', () => {
+        playSynthSound("click");
+        showTaskNotesModal(task.id, task.title);
+      });
 
       // Delete button for custom tasks
       if (isCustom) {
@@ -1689,6 +2315,32 @@ function cycleQuotes() {
   }, 12000);
 }
 
+// ⭐ NEW: Go to Today - Jump calendar to today's date and open the day details
+function goToToday() {
+  const realToday = getRealCurrentDate();
+  const todayMonth = realToday.substring(0, 7); // "2026-06" format
+  
+  // Switch active month to today's month
+  activeMonth = todayMonth;
+  
+  playSynthSound("click");
+  
+  // Re-render calendar and month controls
+  renderCalendarMonthControls();
+  renderCalendarDays();
+  
+  // Open today's day details
+  setTimeout(() => {
+    showDayDetails(realToday);
+    
+    // Scroll today's cell into view
+    const todayCell = document.querySelector(".day-cell.today-cell");
+    if (todayCell) {
+      todayCell.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, 100);
+}
+
 // 12. EVENT LISTENERS & SETUP
 document.addEventListener("DOMContentLoaded", () => {
   // Load local storage state
@@ -1795,4 +2447,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("auth-signout-btn").addEventListener("click", () => {
     if (typeof signOutFirebase === "function") signOutFirebase();
   });
+  
+  // ⭐ NEW: Go to Today button
+  const goToTodayBtn = document.getElementById("go-to-today-btn");
+  if (goToTodayBtn) {
+    goToTodayBtn.addEventListener("click", goToToday);
+  }
+  
+  // ⭐ NEW: Auto-open the month containing today on page load
+  const realTodayDate = getRealCurrentDate();
+  const todayMonth = realTodayDate.substring(0, 7);
+  activeMonth = todayMonth;
+  renderCalendarMonthControls();
+  renderCalendarDays();
 });

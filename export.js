@@ -921,7 +921,15 @@
       ], data.resources, { tabColor: "FF10B981", statusKey: "status" });
     }
 
-    if (plan.settings) writeSettings(wb);
+    // ⭐ NEW: Write optional worksheets
+    if (plan.settings) {
+      writeCategories(wb, data);
+      writeExtracurriculars(wb, data);
+      writeMentorMeetings(wb, data);
+      writePalanaPrepSummary(wb, data);
+      writeAHFTasks(wb, data);
+      writeSettings(wb);
+    }
 
     return wb;
   }
@@ -999,6 +1007,155 @@
       rr.getCell(3).font = { name: "Consolas", color: { argb: "FF6B2D8C" } }; rr.getCell(3).border = BORDER;
     });
     return ws;
+  }
+
+  // ⭐ NEW: Export Categories worksheet
+  function writeCategories(wb, data) {
+    if (!typeof BUILT_IN_CATEGORIES === "object") return; // Safety check
+    writeTable(wb, "Categories", [
+      { header: "Category", key: "name", width: 20 },
+      { header: "Icon", key: "icon", width: 6 },
+      { header: "Color", key: "color", width: 12 },
+      { header: "Weekly Target", key: "target", type: "hours", width: 13 },
+      { header: "Priority", key: "priority", type: "int", width: 9 },
+      { header: "Required", key: "required", width: 10 },
+      { header: "Description", key: "description", width: 36, wrap: true }
+    ], Object.entries(typeof BUILT_IN_CATEGORIES === "object" ? BUILT_IN_CATEGORIES : {}).map(([id, cat]) => ({
+      name: cat.name || id,
+      icon: cat.icon || "✨",
+      color: cat.color || "#ffffff",
+      target: cat.weeklyTarget || 0,
+      priority: cat.priority || 99,
+      required: cat.required ? "Yes" : "No",
+      description: cat.description || ""
+    })), { tabColor: "FFE879F9" });
+  }
+
+  // ⭐ NEW: Export Extracurriculars worksheet
+  function writeExtracurriculars(wb, data) {
+    const extracurrs = (S().extracurriculars || []);
+    if (extracurrs.length === 0) return;
+    writeTable(wb, "Extracurriculars", [
+      { header: "Activity", key: "name", width: 24, wrap: true },
+      { header: "Role", key: "role", width: 20, wrap: true },
+      { header: "Category", key: "category", width: 16 },
+      { header: "Status", key: "status", width: 18 },
+      { header: "Weekly Hours", key: "hours", type: "hours", width: 12 },
+      { header: "Next Event/Deadline", key: "event", width: 26, wrap: true },
+      { header: "Notes", key: "notes", width: 28, wrap: true }
+    ], extracurrs.map(ec => ({
+      name: ec.name,
+      role: ec.role,
+      category: ec.categoryId,
+      status: ec.status,
+      hours: ec.weeklyHours,
+      event: ec.nextEvent || "TBD",
+      notes: ec.notes || ""
+    })), { tabColor: "FF86EFAC" });
+  }
+
+  // ⭐ NEW: Export Mentor Meetings worksheet
+  function writeMentorMeetings(wb, data) {
+    const mentorTasks = [];
+    (S().days || []).forEach(day => {
+      (day.tasks || []).forEach(t => {
+        if (t.category === "mentor" && t.recurring) {
+          mentorTasks.push({
+            date: pd(day.date),
+            dateStr: day.date,
+            title: t.title,
+            duration: t.duration,
+            recurring: t.recurring,
+            completed: t.completed ? "Yes" : "No"
+          });
+        }
+      });
+    });
+    
+    if (mentorTasks.length === 0) return;
+    
+    // Remove duplicates and summarize
+    const summary = [];
+    const seen = {};
+    mentorTasks.forEach(t => {
+      if (!seen[t.recurring]) {
+        seen[t.recurring] = true;
+        const freq = t.recurring.includes("sunday") ? "Every Sunday" : "Every Monday";
+        summary.push({
+          frequency: freq,
+          title: t.title,
+          duration: t.duration,
+          example: t.dateStr
+        });
+      }
+    });
+    
+    writeTable(wb, "Mentor Meetings", [
+      { header: "Frequency", key: "frequency", width: 18 },
+      { header: "Meeting Name", key: "title", width: 32, wrap: true },
+      { header: "Duration", key: "duration", type: "hours", width: 10 },
+      { header: "Example Date", key: "example", type: "date", width: 13 }
+    ], summary, { tabColor: "FFFBBF24" });
+  }
+
+  // ⭐ NEW: Export Palana Prep worksheet
+  function writePalanaPrepSummary(wb, data) {
+    const palanaTasks = [];
+    (S().days || []).forEach(day => {
+      if (day.date >= "2026-06-15" && day.date <= "2026-06-27") {
+        (day.tasks || []).forEach(t => {
+          if (t.category === "palana") {
+            palanaTasks.push({
+              date: pd(day.date),
+              dateStr: day.date,
+              title: t.title,
+              duration: t.duration,
+              completed: t.completed ? "✓" : ""
+            });
+          }
+        });
+      }
+    });
+    
+    if (palanaTasks.length === 0) return;
+    
+    writeTable(wb, "Palana Prep (Jun 15-27)", [
+      { header: "Date", key: "date", type: "date", width: 12 },
+      { header: "Task", key: "title", width: 48, wrap: true },
+      { header: "Hours", key: "duration", type: "hours", width: 8 },
+      { header: "Completed", key: "completed", width: 10 }
+    ], palanaTasks, { tabColor: "FFFF85A2" });
+  }
+
+  // ⭐ NEW: Export AHF Tasks worksheet
+  function writeAHFTasks(wb, data) {
+    const ahfTasks = [];
+    (S().days || []).forEach(day => {
+      if (day.date >= "2026-06-15" && day.date <= "2026-08-21") {
+        (day.tasks || []).forEach(t => {
+          if (t.category === "ahf") {
+            ahfTasks.push({
+              date: pd(day.date),
+              dateStr: day.date,
+              title: t.title,
+              duration: t.duration,
+              completed: t.completed ? "✓" : "",
+              status: t.completed ? "Done" : "Pending"
+            });
+          }
+        });
+      }
+    });
+    
+    if (ahfTasks.length === 0) return;
+    
+    writeTable(wb, "AHF Tasks", [
+      { header: "Date", key: "date", type: "date", width: 12 },
+      { header: "Task", key: "title", width: 40, wrap: true },
+      { header: "Hours", key: "duration", type: "hours", width: 8 },
+      { header: "Status", key: "status", type: "status", width: 12 },
+      { header: "✓", key: "completed", width: 5 }
+    ], ahfTasks, { tabColor: "FFFF758C", statusKey: "status" });
   }
 
   function writeSettings(wb) {

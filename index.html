@@ -251,6 +251,9 @@
             <button class="tab-btn active" data-tab="calendar-tab">CALENDAR_VIEW</button>
             <button class="tab-btn" data-tab="list-tab">TRACKS_CHECKLIST</button>
           </div>
+          <button id="go-to-today-btn" class="go-to-today-btn" title="Jump to today's date">
+            <span class="today-icon">📅</span> GO_TO_TODAY
+          </button>
           <div class="calendar-month-controls" id="month-tabs">
             <!-- Buttons dynamically populated by JS (June, July, August, Sept) -->
           </div>
@@ -398,11 +401,115 @@
           <span class="btn-text">FORCE ROLLOVER // "I didn't finish today"</span>
         </button>
       </div>
+
+      <!-- ⭐ NEW: Extracurricular Summary Section -->
+      <div class="extracurricular-section">
+        <div class="extracurricular-header-row">
+          <h3 class="section-title">EXTRACURRICULARS_&_ACTIVITIES</h3>
+          <button id="add-extracurricular-btn" class="icon-btn" title="Add new activity" onclick="addNewExtracurricular()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+        <div id="extracurricular-summary-container" class="extracurricular-summary">
+          <!-- Populated by renderExtracurricularSummary() -->
+        </div>
+      </div>
     </div>
   </div>
   
   <!-- Overlay Backdrop for Drawer & Modals -->
   <div id="overlay-backdrop" class="overlay-backdrop"></div>
+
+  <!-- ⭐ NEW: Task Notes Modal -->
+  <div id="task-notes-modal" class="modal">
+    <div class="modal-header">
+      <h2 id="task-notes-modal-title">TASK_NOTES</h2>
+      <button class="close-btn" onclick="document.getElementById('task-notes-modal').style.display='none'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <textarea id="task-notes-textarea" class="notes-textarea" placeholder="Add notes, observations, learnings, blockers, or next steps..."></textarea>
+      <div class="notes-info">Markdown supported • Auto-saves on click Save</div>
+    </div>
+    <div class="modal-footer">
+      <button id="task-notes-delete-btn" class="btn btn-danger">Delete Notes</button>
+      <button id="task-notes-save-btn" class="btn btn-primary">Save Notes</button>
+    </div>
+  </div>
+
+  <!-- ⭐ NEW: Extracurricular Management Modal -->
+  <div id="extracurricular-modal" class="modal">
+    <div class="modal-header">
+      <h2>MANAGE_EXTRACURRICULAR_ACTIVITY</h2>
+      <button class="close-btn" onclick="document.getElementById('extracurricular-modal').style.display='none'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="extracurricular-form">
+        <div class="form-group">
+          <label for="ec-name">Activity Name</label>
+          <input type="text" id="ec-name" class="form-input" placeholder="e.g., WINFO, AHF">
+        </div>
+        <div class="form-group">
+          <label for="ec-role">Your Role</label>
+          <input type="text" id="ec-role" class="form-input" placeholder="e.g., Finance Director">
+        </div>
+        <div class="form-group">
+          <label for="ec-category">Category</label>
+          <select id="ec-category" class="form-input">
+            <option value="winfo">WINFO</option>
+            <option value="ahf">AHF (Hopeful Fridays)</option>
+            <option value="github">Git Developer Tool</option>
+            <option value="mentor">Mentorship</option>
+            <option value="palana">Palana Prep</option>
+            <option value="info310">INFO 310</option>
+            <option value="leetcode">LeetCode</option>
+            <option value="secplus">Security+</option>
+            <option value="aws">AWS</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="ec-status">Status</label>
+          <select id="ec-status" class="form-input">
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="archived">Archived</option>
+            <option value="active-until-june-27">Active Until June 27</option>
+            <option value="active-through-aug-21">Active Through Aug 21</option>
+            <option value="active-until-passed">Active Until Passed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="ec-weeklyHours">Weekly Hours</label>
+          <input type="number" id="ec-weeklyHours" class="form-input" placeholder="5" min="0" step="0.5">
+        </div>
+        <div class="form-group">
+          <label for="ec-nextEvent">Next Event/Deadline</label>
+          <input type="text" id="ec-nextEvent" class="form-input" placeholder="e.g., Monday meeting with Matt">
+        </div>
+        <div class="form-group">
+          <label for="ec-notes">Notes</label>
+          <textarea id="ec-notes" class="form-input" placeholder="Additional notes about this activity..."></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('extracurricular-modal').style.display='none'">Cancel</button>
+      <button id="ec-save-btn" class="btn btn-primary">Save Activity</button>
+    </div>
+  </div>
 
   <!-- Settings Configuration Modal -->
   <div id="settings-modal" class="modal">
