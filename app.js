@@ -114,6 +114,42 @@ const BUILT_IN_CATEGORIES = {
     required: false,
     description: "Cybersecurity mentorship sessions"
   },
+  travel: {
+    name: "Travel",
+    icon: "✈️",
+    color: "#87CEEB",
+    weeklyTarget: 0,
+    priority: 12,
+    required: false,
+    description: "Travel days with reduced capacity"
+  },
+  catchup: {
+    name: "Catch-Up",
+    icon: "🔄",
+    color: "#DDA0DD",
+    weeklyTarget: 0,
+    priority: 13,
+    required: false,
+    description: "Catch-up and rescheduled work"
+  },
+  personal: {
+    name: "Personal",
+    icon: "🏠",
+    color: "#F0E68C",
+    weeklyTarget: 0,
+    priority: 14,
+    required: false,
+    description: "Personal tasks and breaks"
+  },
+  palana_security: {
+    name: "Palana Security",
+    icon: "🛡️",
+    color: "#FF6B6B",
+    weeklyTarget: 10,
+    priority: 15,
+    required: false,
+    description: "Active Palana security engineering role"
+  },
   custom: {
     name: "Custom",
     icon: "✨",
@@ -349,7 +385,8 @@ const CORE_CURRICULUM = {
 
 // Bump this whenever the schedule-generation logic changes. On load, saved states
 // (local + cloud) with an older version auto-migrate while preserving completed tasks.
-const SCHEDULE_VERSION = 2;
+const SCHEDULE_VERSION = 3;
+const PLAN_TIMEZONE = "America/Los_Angeles";
 
 let appState = {
   settings: {
@@ -381,82 +418,72 @@ const INFO_END_STR = "2026-08-21";
 // front-loaded into the lead-up window (plan start → day before onboarding).
 const PALANA_ONBOARDING_STR = "2026-06-27";
 
-// ⭐ NEW: DETAILED PALANA PREPARATION TASKS (June 15-27)
+// Detailed Palana Preparation tasks (June 15–28, 2026). Mentor meetings come from buildMentorTasksForDay().
 const PALANA_PREP_TASKS_DETAILED = {
-  "2026-06-15": [ // Sunday - Organize and begin threat modeling
-    { title: "Create Palana security workspace (sections: meeting notes, architecture, threat model, findings, questions, weekly updates)", duration: 0.75, time: 45 },
-    { title: "Write down known Palana technology stack (React Native, Expo, Go, Firebase, Google Cloud, Railway, Next.js, WebSockets)", duration: 0.33, time: 20 },
-    { title: "Begin cybersecurity threat-modeling course (3.5 hour total across week - schedule first section today)", duration: 1.0, time: 60 }
+  "2026-06-15": [ // Monday
+    { title: "Create Palana security workspace (meeting notes, architecture, threat model, findings, questions, weekly updates)", duration: 0.75 },
+    { title: "Write down known Palana technology stack (React Native, Expo, Go, Firebase, GCP, Railway, Next.js, WebSockets)", duration: 0.33 },
+    { title: "Begin cybersecurity threat-modeling course (first section of 3.5h total)", duration: 1.0 }
   ],
-  "2026-06-16": [ // Monday - Security foundations and assets
-    { title: "Weekly cybersecurity mentor meeting with Matt", duration: 1.0, time: 60, recurring: "Monday" },
-    { title: "Continue threat-modeling course (review: CIA, assets, threats, vulnerabilities, risk, controls)", duration: 1.0, time: 60 },
-    { title: "Create Palana asset inventory (rider location, pickup/destination, ride history, email, driver info, tokens, admin accounts, Firebase, API credentials, logs; document: impact if exposed/changed/unavailable)", duration: 1.5, time: 90 }
+  "2026-06-16": [ // Tuesday
+    { title: "Continue threat-modeling course (CIA, assets, threats, vulnerabilities, risk, controls)", duration: 1.0 },
+    { title: "Create Palana asset inventory (document impact if exposed/changed/unavailable for each asset)", duration: 1.5 }
   ],
-  "2026-06-17": [ // Tuesday - Finish threat modeling and begin threat register
-    { title: "Finish remaining cybersecurity threat-modeling course", duration: 1.5, time: 90 },
-    { title: "Review four core threat-modeling questions (What are we building? What can go wrong? What are we doing about it? Did we do enough?)", duration: 0.5, time: 30 },
-    { title: "Create Threat Register Version 0.1 (component, asset, threat, impact, likelihood, risk, mitigation) with at least 5 initial threats (examples: rider accesses another rider's trip, user changes role to driver, location data stored too long, WebSocket exposes updates, repeated requests overwhelm queue)", duration: 1.0, time: 60 }
+  "2026-06-17": [ // Wednesday
+    { title: "Finish remaining threat-modeling course portions", duration: 1.5 },
+    { title: "Review four core threat-modeling questions", duration: 0.5 },
+    { title: "Create Threat Register v0.1 with at least 5 initial threats", duration: 1.0 }
   ],
-  "2026-06-18": [ // Wednesday - Architecture and data flow analysis
-    { title: "Watch cybersecurity videos provided by Matt (add notes field for video links, allow multiple resources)", duration: 1.0, time: 60 },
-    { title: "Create Draft Palana Data-Flow Diagram Version 0.1 (include: rider, React/Expo, Go API, Railway, Firebase, Google Cloud, driver interface, admin interface, Next.js, WebSockets, authentication, external services, user devices; mark trust boundaries)", duration: 1.0, time: 60 }
+  "2026-06-18": [ // Thursday
+    { title: "Watch cybersecurity videos from Matt (add video links in notes)", duration: 1.0 },
+    { title: "Create Draft Palana Data-Flow Diagram v0.1 with trust boundaries", duration: 1.0 }
   ],
-  "2026-06-19": [ // Thursday - STRIDE and structured threat analysis
-    { title: "Study STRIDE methodology (Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, Elevation of privilege)", duration: 1.0, time: 60 },
-    { title: "Apply STRIDE to Palana's ride-request flow (write at least 2 threats for each category)", duration: 1.0, time: 60 },
-    { title: "Complete PortSwigger-related threat analysis (attach lab/article link, record: vulnerable flow, likely attack, possible mitigation)", duration: 0.5, time: 30 }
+  "2026-06-19": [ // Friday
+    { title: "Study STRIDE and apply to Palana ride-request flow (2+ threats per category)", duration: 1.0 },
+    { title: "Complete PortSwigger threat/vulnerability analysis (attach lab link)", duration: 1.0 }
   ],
-  "2026-06-20": [ // Friday - Firebase authorization review
-    { title: "Review Firebase security fundamentals (authentication vs authorization, request.auth, user ownership, role-based access, deny-by-default, data validation, Firestore rules, Storage rules, Firebase Emulator Suite)", duration: 1.5, time: 90 },
-    { title: "Create Firebase review checklist (Can users read only their own? Can rider edit another's trip? Can users write unexpected fields? Can user assign themselves admin? Are rules in GitHub? Are automated tests available? Does Admin SDK bypass client-side rules?)", duration: 0.75, time: 45 }
+  "2026-06-20": [ // Saturday
+    { title: "Review Firebase security (auth vs authorization, rules, emulator suite)", duration: 1.5 },
+    { title: "Create Firebase review checklist", duration: 0.75 }
   ],
-  "2026-06-21": [ // Saturday - Weekly review and mentor preparation
-    { title: "Review week's notes and clean up DFD", duration: 0.75, time: 45 },
-    { title: "Clean up threat register", duration: 0.5, time: 30 },
-    { title: "Complete beginner Firebase or access-control exercise", duration: 0.5, time: 30 },
-    { title: "Complete labs/preparation for Monday meeting with Matt", duration: 0.5, time: 30 },
-    { title: "Write down questions for Matt", duration: 0.25, time: 15 },
-    { title: "Create Week 1 summary", duration: 0.5, time: 30 }
+  "2026-06-21": [ // Sunday
+    { title: "Review week's notes, clean up DFD and threat register", duration: 0.75 },
+    { title: "Complete beginner Firebase/access-control exercise", duration: 0.5 },
+    { title: "Write questions for Matt and create Week 1 summary", duration: 0.75 }
   ],
-  "2026-06-22": [ // Sunday - Week 2: Authorization and access control
-    { title: "Weekly meeting with Matt", duration: 1.0, time: 60 },
-    { title: "Study broken access control and IDOR (Insecure Direct Object References)", duration: 1.0, time: 60 },
-    { title: "Create authorization test plan with at least 10 tests (rider views/cancels another's trip, accesses driver info, performs admin action, changed ID exposes record, logged-out user accesses data, deleted token still works, subscribes to another's WebSocket, client changes role, accesses location history)", duration: 1.0, time: 60 }
+  "2026-06-22": [ // Monday
+    { title: "Study broken access control and IDOR", duration: 1.0 },
+    { title: "Create authorization test plan with at least 10 tests", duration: 1.0 }
   ],
-  "2026-06-23": [ // Monday - Burp Suite and request manipulation
-    { title: "Practice with Burp Suite (proxy, HTTP history, Repeater, modifying IDs/headers, removing auth tokens, comparing accounts, repeating requests, inspecting data)", duration: 1.5, time: 90 },
-    { title: "Complete at least one PortSwigger access-control lab (record: request changed, expected result, actual result, security impact, mitigation, lab link)", duration: 0.5, time: 30 }
+  "2026-06-23": [ // Tuesday
+    { title: "Practice Burp Suite (proxy, repeater, modify IDs/headers/tokens)", duration: 1.5 },
+    { title: "Complete PortSwigger access-control lab (record request, impact, mitigation)", duration: 0.5 }
   ],
-  "2026-06-24": [ // Tuesday - Travel day (INDIA_TRIP starts)
-    { title: "Save notes for offline access", duration: 0.25, time: 15 },
-    { title: "Download diagrams", duration: 0.1, time: 6 },
-    { title: "Save onboarding questions", duration: 0.1, time: 6 },
-    { title: "Review CIA and STRIDE if convenient", duration: 0.1, time: 6 }
+  "2026-06-24": [ // Wednesday — travel day
+    { title: "Save notes for offline access", duration: 0.25 },
+    { title: "Download diagrams and save onboarding questions", duration: 0.15 },
+    { title: "Review CIA and STRIDE if convenient", duration: 0.15 }
   ],
-  "2026-06-25": [ // Wednesday - Writing professional findings
-    { title: "Create finding template (title, severity, affected component, summary, preconditions, reproduction steps, expected/actual behavior, evidence, security impact, remediation, retesting, assigned developer, status)", duration: 0.75, time: 45 },
-    { title: "Create sample finding: 'Rider can access another rider's active trip by changing the ride ID'", duration: 0.25, time: 15 }
+  "2026-06-25": [ // Thursday
+    { title: "Create professional finding template (title, severity, steps, impact, remediation)", duration: 0.75 },
+    { title: "Sample finding: Rider can access another rider's active trip by changing ride ID", duration: 0.25 }
   ],
-  "2026-06-26": [ // Thursday - Onboarding preparation
-    { title: "Organize questions into categories (data/privacy, architecture, auth, Firebase/backend, permissions testing, finding reporting)", duration: 0.5, time: 30 },
-    { title: "Choose top 12 questions to ask", duration: 0.25, time: 15 },
-    { title: "Create vulnerability-searching checklist (broken access control, auth flaws, role escalation, Firebase rules, API auth, input validation, data exposure, WebSocket auth, rate limiting, logging, secrets, location privacy, data retention, error messages, abuse cases)", duration: 0.25, time: 15 },
-    { title: "Prepare short introduction for onboarding", duration: 0.2, time: 12 }
+  "2026-06-26": [ // Friday
+    { title: "Organize onboarding questions into categories and choose top 12", duration: 0.5 },
+    { title: "Create vulnerability-searching checklist", duration: 0.25 },
+    { title: "Prepare short introduction for onboarding", duration: 0.25 }
   ],
-  "2026-06-27": [ // Friday - Palana onboarding day
-    { title: "Attend Palana onboarding", duration: 2.0, time: 120 },
-    { title: "Ask for: architecture docs, database schema, Firebase products used, repo access, staging/test environment, role-based test accounts, issue-tracker access, existing security findings", duration: 0.5, time: 30 },
-    { title: "Confirm testing boundaries and prohibition on production testing", duration: 0.25, time: 15 },
-    { title: "Confirm reporting and severity process", duration: 0.25, time: 15 },
-    { title: "Write immediate onboarding notes", duration: 0.75, time: 45 }
+  "2026-06-27": [ // Saturday — onboarding day
+    { title: "Attend Palana onboarding", duration: 2.0 },
+    { title: "Ask for architecture docs, schema, Firebase products, repo/staging access", duration: 0.5 },
+    { title: "Confirm testing boundaries and reporting process", duration: 0.5 },
+    { title: "Write immediate onboarding notes — Palana Security Onboarding Summary", duration: 0.75 }
   ],
-  "2026-06-28": [ // Saturday - Optional follow-up (after onboarding weekend)
-    { title: "Organize onboarding notes (optional light follow-up)", duration: 0.75, time: 45 },
-    { title: "Record access received", duration: 0.25, time: 15 },
-    { title: "Record missing access", duration: 0.25, time: 15 },
-    { title: "List first three likely tasks", duration: 0.5, time: 30 },
-    { title: "Decide whether to activate Palana Security Role category", duration: 0.25, time: 15 }
+  "2026-06-28": [ // Sunday — optional follow-up
+    { title: "Organize onboarding notes (optional)", duration: 0.75 },
+    { title: "Record access received and missing access", duration: 0.25 },
+    { title: "List first three likely tasks", duration: 0.5 },
+    { title: "Decide whether to activate Palana Security Role", duration: 0.25 }
   ]
 };
 
@@ -500,6 +527,31 @@ const AHF_TASKS_DETAILED = {
     { title: "Create pre-travel handoff status update (poll/meeting status, GHL findings, email test results, Planner findings, Trello findings, missing permissions, decisions needed, recommended next step)", duration: 1.0, time: 60 },
     { title: "Save documents in AHF-controlled location and share access", duration: 0.5, time: 30 },
     { title: "Turn off test workflows and mark incomplete work", duration: 0.5, time: 30 }
+  ],
+  "2026-07-09": [
+    { title: "Review messages and decisions after travel", duration: 0.75 },
+    { title: "Update master task document and identify active work", duration: 0.75 },
+    { title: "Meet Rahul if needed; confirm website approval and GitHub access", duration: 1.0 }
+  ],
+  "2026-07-10": [
+    { title: "Practice feature branches, pull requests, and review workflow", duration: 1.0 },
+    { title: "Practice merge conflicts and branch protection", duration: 1.0 }
+  ],
+  "2026-07-13": [
+    { title: "Receive knowledge-transfer documentation and clone/run website", duration: 1.5 },
+    { title: "Review file structure, form-to-GHL connection, env vars, hosting", duration: 1.0 }
+  ],
+  "2026-07-14": [
+    { title: "Plan dev/staging/production branches and document deployment", duration: 1.0 },
+    { title: "Make one small feature-branch change (if website approved)", duration: 1.0 }
+  ],
+  "2026-07-20": [
+    { title: "Set up development and staging environments", duration: 1.5 },
+    { title: "Add branch protections and require PR approval", duration: 1.0 }
+  ],
+  "2026-07-21": [
+    { title: "Test one deployment and document rollback procedure", duration: 1.0 },
+    { title: "Prevent accidental production deployment", duration: 0.5 }
   ]
 };
 
@@ -568,6 +620,43 @@ function getRealCurrentDateObj() {
   return parseDate(dateStr);
 }
 
+// Plan "today" — real LA date clamped to plan window (never hardcoded June 13)
+function planToday() {
+  const real = getRealCurrentDate();
+  if (real < START_DATE_STR) return START_DATE_STR;
+  if (real > END_DATE_STR) return END_DATE_STR;
+  return real;
+}
+
+function isPlanPast(dateStr) {
+  return dateStr < planToday();
+}
+
+function isPlanFuture(dateStr) {
+  return dateStr > planToday();
+}
+
+// Merge built-in + user custom categories
+function getAllCategories() {
+  const merged = {};
+  Object.entries(BUILT_IN_CATEGORIES).forEach(([id, cat]) => {
+    merged[id] = Object.assign({ id, builtIn: true, active: true, archived: false, exportEnabled: true, order: cat.priority || 99 }, cat);
+  });
+  Object.entries(appState.categories || {}).forEach(([id, cat]) => {
+    merged[id] = Object.assign({ id, builtIn: false }, cat);
+  });
+  return merged;
+}
+
+function getCategoryDef(catId) {
+  const all = getAllCategories();
+  return all[catId] || BUILT_IN_CATEGORIES.custom || { name: catId, icon: "✨", color: "#ffffff" };
+}
+
+function getCategoryLabel(catId) {
+  return getCategoryDef(catId).name || catId;
+}
+
 function isIndiaTrip(dateStr) {
   return dateStr >= INDIA_START_STR && dateStr <= INDIA_END_STR;
 }
@@ -613,23 +702,25 @@ function buildMentorTasksForDay(dateStr) {
     tasks.push({
       id: `${dateStr}_mentor_meeting`,
       category: "mentor",
-      title: "Weekly Mentor Meeting with Matt",
+      title: "Cybersecurity Mentor Meeting with Matt",
       duration: 1.0,
       completed: false,
       recurring: "weekly-monday",
+      fixed: true,
       link: null
     });
   }
   
-  // Every Sunday: Mentor Lab Preparation (1 hour)
+  // Every Sunday: Mentor Lab Preparation (1-2 hours)
   if (dayOfWeek === 0) {
     tasks.push({
       id: `${dateStr}_mentor_prep`,
       category: "mentor",
       title: "Mentor Lab Preparation (prep for Monday meeting)",
-      duration: 1.0,
+      duration: 1.5,
       completed: false,
       recurring: "weekly-sunday",
+      fixed: true,
       link: null
     });
   }
@@ -646,52 +737,35 @@ function isPalanaPrepWindow(dateStr) {
 // After onboarding: regular weekday safety-engineering work blocks.
 function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
   if (!appState.settings.palanaEnabled) return [];
-  if (isIndia) return []; // India trip is capacity-capped; no Palana blocks
+  if (isIndia && dateStr !== "2026-06-24") return [];
 
-  // ⭐ NEW: Use detailed tasks if available (June 15-27), otherwise generic
+  // Detailed prep through June 28
   if (dateStr in PALANA_PREP_TASKS_DETAILED) {
-    const tasksForDay = PALANA_PREP_TASKS_DETAILED[dateStr];
-    return tasksForDay.map((task, index) => ({
+    return PALANA_PREP_TASKS_DETAILED[dateStr].map((task, index) => ({
       id: `${dateStr}_palana_${index}`,
       category: "palana",
       title: task.title,
       duration: task.duration,
       completed: false,
-      fixed: true, // Don't reschedule Palana prep tasks
-      recurring: task.recurring || false,
+      fixed: dateStr <= "2026-06-27",
       link: null
     }));
   }
 
-  if (isPalanaPrepWindow(dateStr)) {
-    // Intensive onboarding prep — front-loaded before the job starts.
-    let hours;
-    if (dayOfWeek === 0) hours = 1.0;        // Sunday (light, it's a rest day)
-    else if (dayOfWeek === 6) hours = 2.0;   // Saturday
-    else hours = 3.0;                         // Weekday — intensive
-    const offset = getDaysBetween(START_DATE_STR, dateStr);
-    const title = PALANA_PREP_TASKS[offset % PALANA_PREP_TASKS.length];
-    return [{
-      id: `${dateStr}_palana`,
-      category: "palana",
-      title: `🚀 ${title}`,
-      duration: hours,
-      completed: false,
-      link: null
-    }];
-  }
-
-  // Regular Palana work after onboarding (weekdays only): Mon-Thu 1.5h, Fri 2h.
-  if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-    const palanaHours = (dayOfWeek === 5) ? 2.0 : 1.5;
-    return [{
-      id: `${dateStr}_palana`,
-      category: "palana",
-      title: "Palana Work (Safety Engineering)",
-      duration: palanaHours,
-      completed: false,
-      link: null
-    }];
+  // After onboarding: only schedule if Palana Security Role is activated
+  if (dateStr > "2026-06-28") {
+    if (!appState.settings.palanaSecurityEnabled) return [];
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      const palanaHours = dayOfWeek === 5 ? 2.0 : 1.5;
+      return [{
+        id: `${dateStr}_palana_sec`,
+        category: "palana_security",
+        title: "Palana Security Engineering Work",
+        duration: palanaHours,
+        completed: false,
+        link: null
+      }];
+    }
   }
   return [];
 }
@@ -780,17 +854,10 @@ function generateBaseSchedule() {
       dayObj.tasks.push(task);
     });
 
-    // 5. GitHub Extension Passion Project (2 hours/week, Saturday preferred, unless on India Trip).
-    //    Paused on Palana-prep Saturdays so the day stays within capacity for job prep.
-    if (dayOfWeek === 6 && !isIndia && !(appState.settings.palanaEnabled && isPalanaPrepWindow(dateStr))) {
-      dayObj.tasks.push({
-        id: `${dateStr}_github`,
-        category: "github",
-        title: "Git Extension Project – Beginner/Pro GitHub Tool (with friend)",
-        duration: 2.0,
-        completed: false,
-        link: null
-      });
+    // 5. Git Developer Productivity Tool (8-week roadmap via git-roadmap.js)
+    if (typeof buildGitProjectTasksForDay === "function" && dateStr >= "2026-06-15") {
+      const gitTasks = buildGitProjectTasksForDay(dateStr, dayOfWeek, isIndia);
+      gitTasks.forEach(t => dayObj.tasks.push(t));
     }
 
     // 6. ⭐ NEW: Mentor Meetings (recurring: Monday + Sunday prep)
@@ -1226,57 +1293,29 @@ function reflowRemainingCurriculum() {
     const isClassActive = isInfo310Class(day.date);
     const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     
-    // AHF (unless completed)
+    // AHF — use detailed tasks when available
     if (!day.tasks.some(t => t.category === "ahf")) {
-      day.tasks.push({
-        id: `${day.date}_ahf`,
-        category: "ahf",
-        title: "AHF Work (Tech Lead Duties)",
-        duration: 1.0,
-        completed: false,
-        link: null
-      });
+      buildAHFTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
     
-    // Check if LeetCode task already exists as completed
-    const existingLcCount = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over")).length;
-    lcIndex += existingLcCount;
-
-    // LeetCode (unless completed and not Sunday)
-    if (dayOfWeek !== 0 && existingLcCount === 0) {
+    // LeetCode — exactly 1 problem per day (including Sunday and Monday)
+    const existingLc = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over"));
+    lcIndex += existingLc.length;
+    if (existingLc.length === 0) {
       const problem = BLIND_75_QUESTIONS[lcIndex % 75];
-      const lcTitle = `LeetCode Blind 75: #${problem.id} - ${problem.name}`;
-      const lcLink = problem.link;
-      const lcId = problem.id;
-      lcIndex++;
-      
       day.tasks.push({
         id: `${day.date}_leetcode`,
         category: "leetcode",
-        title: lcTitle,
+        title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
         duration: 0.5,
         completed: false,
-        link: lcLink,
-        leetcodeId: lcId
+        link: problem.link,
+        leetcodeId: problem.id
       });
-
-      // If it's Monday, add second problem (since Sunday was skipped)
-      if (dayOfWeek === 1 && lcIndex > 0) {
-        const problem2 = BLIND_75_QUESTIONS[lcIndex % 75];
-        day.tasks.push({
-          id: `${day.date}_leetcode_2`,
-          category: "leetcode",
-          title: `LeetCode Blind 75: #${problem2.id} - ${problem2.name}`,
-          duration: 0.5,
-          completed: false,
-          link: problem2.link,
-          leetcodeId: problem2.id
-        });
-        lcIndex++;
-      }
+      lcIndex++;
     }
 
-    // INFO 310 (unless completed)
+    // INFO 310
     if (isClassActive && isWeekday && !day.tasks.some(t => t.category === "info310")) {
       day.tasks.push({
         id: `${day.date}_info310`,
@@ -1288,25 +1327,21 @@ function reflowRemainingCurriculum() {
       });
     }
 
-    // Palana — intensive onboarding prep in lead-up window, regular work after
-    // (unless a Palana task is already present/completed for this day)
-    if (!day.tasks.some(t => t.category === "palana")) {
-      const palanaTask = buildPalanaTaskForDay(day.date, dayOfWeek, isIndia);
-      if (palanaTask) {
-        day.tasks.push(palanaTask);
+    // Palana prep / security (array return)
+    if (!day.tasks.some(t => t.category === "palana" || t.category === "palana_security")) {
+      buildPalanaTaskForDay(day.date, dayOfWeek, isIndia).forEach(t => day.tasks.push(t));
+    }
+
+    // Git Developer Productivity Tool roadmap
+    if (typeof buildGitProjectTasksForDay === "function" && day.date >= "2026-06-15") {
+      if (!day.tasks.some(t => t.category === "github")) {
+        buildGitProjectTasksForDay(day.date, dayOfWeek, isIndia).forEach(t => day.tasks.push(t));
       }
     }
 
-    // Git Project (unless completed). Paused on Palana-prep Saturdays for job-prep capacity.
-    if (dayOfWeek === 6 && !isIndia && !(appState.settings.palanaEnabled && isPalanaPrepWindow(day.date)) && !day.tasks.some(t => t.category === "github")) {
-      day.tasks.push({
-        id: `${day.date}_github`,
-        category: "github",
-        title: "Git Extension Project – Beginner/Pro GitHub Tool (with friend)",
-        duration: 2.0,
-        completed: false,
-        link: null
-      });
+    // Mentor meetings (fixed recurring)
+    if (!day.tasks.some(t => t.category === "mentor")) {
+      buildMentorTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
   }
 
@@ -1363,16 +1398,21 @@ function initializeTaskNotes() {
 
 function getTaskNotes(taskId) {
   initializeTaskNotes();
-  return appState.taskNotes[taskId] || { text: "", lastUpdated: null };
+  const n = appState.taskNotes[taskId];
+  if (!n) return { text: "", plannedOutcome: "", actualOutcome: "", learned: "", blockers: "", nextStep: "", links: "", lastUpdated: null };
+  if (typeof n === "string") return { text: n, plannedOutcome: "", actualOutcome: "", learned: "", blockers: "", nextStep: "", links: "", lastUpdated: null };
+  return n;
 }
 
-function saveTaskNote(taskId, text) {
+function saveTaskNote(taskId, noteObj) {
   initializeTaskNotes();
-  appState.taskNotes[taskId] = {
-    text: text,
-    lastUpdated: new Date().toISOString()
-  };
+  appState.taskNotes[taskId] = Object.assign({}, noteObj, { lastUpdated: new Date().toISOString() });
   saveState();
+}
+
+function taskHasNotes(taskId) {
+  const n = getTaskNotes(taskId);
+  return !!(n.text || n.plannedOutcome || n.actualOutcome || n.learned || n.blockers || n.nextStep || n.links);
 }
 
 function deleteTaskNote(taskId) {
@@ -1384,31 +1424,247 @@ function deleteTaskNote(taskId) {
 function showTaskNotesModal(taskId, taskTitle) {
   const notes = getTaskNotes(taskId);
   const modal = document.getElementById("task-notes-modal");
-  const textarea = document.getElementById("task-notes-textarea");
   const modalTitle = document.getElementById("task-notes-modal-title");
   const saveBtn = document.getElementById("task-notes-save-btn");
   const deleteBtn = document.getElementById("task-notes-delete-btn");
-  
+  const fields = ["task-notes-text", "task-notes-planned", "task-notes-actual", "task-notes-learned", "task-notes-blockers", "task-notes-next", "task-notes-links"];
+  const keys = ["text", "plannedOutcome", "actualOutcome", "learned", "blockers", "nextStep", "links"];
+
   modalTitle.textContent = `Notes: ${taskTitle}`;
-  textarea.value = notes.text || "";
-  
+  fields.forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (el) el.value = notes[keys[i]] || "";
+  });
+  const updatedEl = document.getElementById("task-notes-updated");
+  if (updatedEl) updatedEl.textContent = notes.lastUpdated ? "Last updated: " + new Date(notes.lastUpdated).toLocaleString() : "";
+
   saveBtn.onclick = () => {
-    saveTaskNote(taskId, textarea.value);
+    const noteObj = {};
+    fields.forEach((id, i) => { const el = document.getElementById(id); noteObj[keys[i]] = el ? el.value : ""; });
+    saveTaskNote(taskId, noteObj);
     modal.style.display = "none";
     playSynthSound("success");
-    renderDashboard();
+    if (selectedDate) showDayDetails(selectedDate);
+    renderTodaySection();
   };
-  
+
   deleteBtn.onclick = () => {
     if (confirm("Delete notes for this task?")) {
       deleteTaskNote(taskId);
       modal.style.display = "none";
       playSynthSound("click");
-      renderDashboard();
     }
   };
-  
+
   modal.style.display = "flex";
+}
+
+// ── Category management ──────────────────────────────────────────────────────
+function openCategoryManager() {
+  renderCategoryList();
+  document.getElementById("category-modal").style.display = "flex";
+}
+
+function renderCategoryList() {
+  const list = document.getElementById("category-list");
+  if (!list) return;
+  const cats = getAllCategories();
+  const sorted = Object.values(cats).sort((a, b) => (a.order || a.priority || 99) - (b.order || b.priority || 99));
+  list.innerHTML = sorted.map(cat => `
+    <div class="category-row ${cat.archived ? 'archived' : ''}" data-id="${cat.id}">
+      <span class="cat-icon" style="color:${cat.color}">${cat.icon}</span>
+      <span class="cat-name">${cat.name}</span>
+      <span class="cat-meta">${cat.weeklyTarget || 0}h/wk · ${cat.required ? "Required" : "Optional"}</span>
+      ${cat.builtIn ? `<button class="action-btn" onclick="editCategory('${cat.id}', true)">View</button>` :
+        `<button class="action-btn" onclick="editCategory('${cat.id}', false)">Edit</button>
+         <button class="action-btn" onclick="archiveCategory('${cat.id}')">${cat.archived ? "Restore" : "Archive"}</button>
+         <button class="action-btn delete-btn" onclick="deleteCategory('${cat.id}')">Delete</button>`}
+    </div>
+  `).join("");
+}
+
+function editCategory(catId, readOnly) {
+  const cat = getCategoryDef(catId);
+  document.getElementById("cat-edit-id").value = catId;
+  document.getElementById("cat-edit-name").value = cat.name || "";
+  document.getElementById("cat-edit-icon").value = cat.icon || "✨";
+  document.getElementById("cat-edit-color").value = cat.color || "#ffffff";
+  document.getElementById("cat-edit-desc").value = cat.description || "";
+  document.getElementById("cat-edit-weekly").value = cat.weeklyTarget || 0;
+  document.getElementById("cat-edit-required").checked = !!cat.required;
+  document.getElementById("cat-edit-priority").value = cat.priority || cat.order || 99;
+  document.getElementById("cat-edit-export").checked = cat.exportEnabled !== false;
+  ["cat-edit-name","cat-edit-icon","cat-edit-color","cat-edit-desc","cat-edit-weekly","cat-edit-priority"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = readOnly && cat.builtIn;
+  });
+  document.getElementById("category-edit-panel").style.display = "block";
+}
+
+function saveCategoryEdit() {
+  const catId = document.getElementById("cat-edit-id").value;
+  if (!catId) return;
+  const builtIn = BUILT_IN_CATEGORIES[catId];
+  if (builtIn) {
+    builtIn.weeklyTarget = parseFloat(document.getElementById("cat-edit-weekly").value) || builtIn.weeklyTarget;
+    saveState();
+  } else {
+    appState.categories[catId] = {
+      id: catId,
+      name: document.getElementById("cat-edit-name").value,
+      icon: document.getElementById("cat-edit-icon").value || "✨",
+      color: document.getElementById("cat-edit-color").value,
+      description: document.getElementById("cat-edit-desc").value,
+      weeklyTarget: parseFloat(document.getElementById("cat-edit-weekly").value) || 0,
+      required: document.getElementById("cat-edit-required").checked,
+      priority: parseInt(document.getElementById("cat-edit-priority").value) || 99,
+      order: parseInt(document.getElementById("cat-edit-priority").value) || 99,
+      exportEnabled: document.getElementById("cat-edit-export").checked,
+      active: true,
+      archived: false
+    };
+    saveState();
+  }
+  renderCategoryList();
+  populateCategorySelects();
+  playSynthSound("success");
+}
+
+function addNewCategory() {
+  const name = document.getElementById("cat-new-name").value.trim();
+  if (!name) return alert("Enter a category name");
+  const id = "custom_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 30) + "_" + Date.now();
+  appState.categories[id] = {
+    id, name,
+    icon: document.getElementById("cat-new-icon").value || "✨",
+    color: document.getElementById("cat-new-color").value || "#ffffff",
+    description: document.getElementById("cat-new-desc").value || "",
+    weeklyTarget: parseFloat(document.getElementById("cat-new-weekly").value) || 0,
+    required: document.getElementById("cat-new-required").checked,
+    priority: parseInt(document.getElementById("cat-new-priority").value) || 50,
+    order: parseInt(document.getElementById("cat-new-priority").value) || 50,
+    exportEnabled: true, active: true, archived: false
+  };
+  saveState();
+  document.getElementById("cat-new-name").value = "";
+  renderCategoryList();
+  populateCategorySelects();
+  playSynthSound("success");
+}
+
+function archiveCategory(catId) {
+  if (!appState.categories[catId]) return;
+  appState.categories[catId].archived = !appState.categories[catId].archived;
+  saveState();
+  renderCategoryList();
+}
+
+function deleteCategory(catId) {
+  if (BUILT_IN_CATEGORIES[catId]) return alert("Built-in categories cannot be deleted.");
+  if (!confirm("Delete this category? Tasks will be preserved under 'custom'.")) return;
+  appState.days.forEach(day => {
+    day.tasks.forEach(t => { if (t.category === catId) t.category = "custom"; });
+  });
+  delete appState.categories[catId];
+  saveState();
+  renderCategoryList();
+  populateCategorySelects();
+}
+
+function populateCategorySelects() {
+  const sel = document.getElementById("new-task-category");
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = "";
+  Object.values(getAllCategories()).filter(c => !c.archived).sort((a, b) => (a.order || 99) - (b.order || 99)).forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+  if (prev) sel.value = prev;
+}
+
+// ── Task action helpers ──────────────────────────────────────────────────────
+function markTaskPartial(task, day, completedHours) {
+  const done = Math.max(0, Math.min(task.duration, completedHours || 0));
+  task.completedMinutes = Math.round(done * 60);
+  task.remainingMinutes = Math.round((task.duration - done) * 60);
+  task.status = done >= task.duration ? "done" : "partial";
+  task.completed = done >= task.duration;
+  if (task.completed) {
+    task.completedOnDate = day.date;
+    task.completedAt = new Date().toISOString();
+  }
+  saveState();
+}
+
+function moveTaskToTomorrow(task, day) {
+  if (task.fixed) return alert("Fixed meetings cannot be moved automatically.");
+  const idx = appState.days.findIndex(d => d.date === day.date);
+  if (idx === -1 || idx + 1 >= appState.days.length) return;
+  const tomorrow = appState.days[idx + 1];
+  if (tomorrow.tasks.reduce((s, t) => s + t.duration, 0) + task.duration > tomorrow.maxCapacity) {
+    return alert("Tomorrow is at capacity. Use Reschedule or Force Rollover.");
+  }
+  day.tasks = day.tasks.filter(t => t.id !== task.id);
+  task.originalDate = task.originalDate || day.date;
+  task.rescheduleCount = (task.rescheduleCount || 0) + 1;
+  tomorrow.tasks.push(task);
+  appState.rescheduleLedger = appState.rescheduleLedger || {};
+  const key = task.title.replace(" (Rolled Over)", "").trim();
+  const led = appState.rescheduleLedger[key] || { originalDate: task.originalDate, count: 0 };
+  led.count++; led.lastMovedFrom = day.date; led.movedOn = planToday();
+  appState.rescheduleLedger[key] = led;
+  saveState();
+  initUI();
+  showDayDetails(tomorrow.date);
+}
+
+function skipTask(task, day) {
+  task.status = "skipped";
+  task.completed = false;
+  saveState();
+  showDayDetails(day.date);
+}
+
+function blockTask(task, day) {
+  task.status = "blocked";
+  saveState();
+  showDayDetails(day.date);
+}
+
+// ── Today dashboard section ──────────────────────────────────────────────────
+function renderTodaySection() {
+  const container = document.getElementById("today-section-container");
+  if (!container) return;
+  const today = planToday();
+  const day = appState.days.find(d => d.date === today);
+  if (!day) { container.innerHTML = "<p>No tasks for today.</p>"; return; }
+
+  const formatted = parseDate(today).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const total = day.tasks.reduce((s, t) => s + t.duration, 0);
+  const done = day.tasks.filter(t => t.completed).length;
+  const pending = day.tasks.filter(t => !t.completed);
+
+  container.innerHTML = `
+    <div class="today-section-header">
+      <h3>📅 TODAY — ${formatted}</h3>
+      <span class="today-stats">${done}/${day.tasks.length} done · ${total.toFixed(1)}h scheduled · ${day.maxCapacity}h capacity</span>
+    </div>
+    <div class="today-task-list">
+      ${pending.length === 0 ? '<p class="today-all-done">All tasks complete for today! 🎉</p>' :
+        pending.map(t => {
+          const cat = getCategoryDef(t.category);
+          return `<div class="today-task-row cat-${t.category}" onclick="showDayDetails('${today}')">
+            <span class="today-cat-badge" style="border-color:${cat.color}">${cat.icon} ${cat.name || t.category}</span>
+            <span class="today-task-title">${t.title}</span>
+            <span class="today-task-dur">${t.duration}h</span>
+            ${taskHasNotes(t.id) ? '<span class="notes-dot">📝</span>' : ''}
+            ${t.fixed ? '<span class="fixed-badge">Fixed</span>' : ''}
+          </div>`;
+        }).join("")}
+    </div>
+  `;
 }
 
 // ⭐ NEW: Extracurricular Summary Rendering
@@ -1565,34 +1821,46 @@ function generateNewState() {
   saveState();
 }
 
-// ⭐ NEW: Migrate from simulated "today" to real browser current date
-// This preserves all completed tasks while updating which day is considered "today"
+// Migrate saved state to v3 — preserves completed tasks and notes
 function migrateToRealCurrentDate() {
-  // Check if we already migrated (v2.1 or higher)
   if (!appState.settings) return;
-  
-  const realToday = getRealCurrentDate();
-  const oldSimulatedToday = appState.settings.lastRolloverDay || START_DATE_STR;
-  
-  // Only migrate if the real today is AFTER the old simulated today
-  if (realToday > oldSimulatedToday) {
-    console.log(`[Migration] Real today (${realToday}) is after simulated today (${oldSimulatedToday}). Updating...`);
-    
-    // Simply update the "today" marker to real today
-    // Completed tasks are already preserved in their day objects
-    appState.settings.lastRolloverDay = realToday;
-    saveState();
-  }
+  // v3: do NOT overwrite lastRolloverDay with real today — that field tracks rollover only.
+  // Real today is always derived from getRealCurrentDate() / planToday().
+  if (appState.settings.migratedRealDateV3) return;
+  appState.settings.migratedRealDateV3 = true;
+  saveState();
 }
 
-// Upgrades an older saved schedule (local or cloud) to the current SCHEDULE_VERSION.
-// Re-applies routines (including the new Palana onboarding prep) and redistributes
-// curriculum while preserving any tasks already marked complete. Returns true if it ran.
 function migrateScheduleIfNeeded() {
   if (!appState || !appState.settings || !appState.days || appState.days.length === 0) return false;
   if (appState.settings.scheduleVersion === SCHEDULE_VERSION) return false;
+
+  // Archive old generic Palana work tasks (preserve completion history)
+  appState.archivedTasks = appState.archivedTasks || [];
+  appState.days.forEach(day => {
+    day.tasks.forEach(t => {
+      if (t.category === "palana" && t.title.includes("Palana Work (Safety Engineering)")) {
+        appState.archivedTasks.push(Object.assign({}, t, { archivedOn: planToday(), reason: "Replaced by Palana Preparation schedule" }));
+      }
+      if (t.category === "github" && t.title.includes("Git Extension Project")) {
+        appState.archivedTasks.push(Object.assign({}, t, { archivedOn: planToday(), reason: "Replaced by Git Developer Productivity Tool roadmap" }));
+      }
+    });
+    day.tasks = day.tasks.filter(t =>
+      !(t.category === "palana" && t.title.includes("Palana Work (Safety Engineering)")) &&
+      !(t.category === "github" && t.title.includes("Git Extension Project"))
+    );
+  });
+
+  // Initialize custom categories object if missing
+  if (!appState.categories) appState.categories = {};
+  if (!appState.taskNotes) appState.taskNotes = {};
+
   appState.settings.scheduleVersion = SCHEDULE_VERSION;
-  reflowRemainingCurriculum(); // preserves completed tasks; re-renders + saves
+  appState.settings.palanaSecurityEnabled = appState.settings.palanaSecurityEnabled || false;
+  appState.settings.ahfWeeklyTarget = appState.settings.ahfWeeklyTarget || 7;
+  migrateToRealCurrentDate();
+  reflowRemainingCurriculum();
   return true;
 }
 
@@ -1709,7 +1977,9 @@ let selectedDate = null;     // Date open in side drawer
 
 function initUI() {
   initializeExtracurriculars();
+  populateCategorySelects();
   renderDashboardMetrics();
+  renderTodaySection();
   renderProjectSelector();
   renderCalendarMonthControls();
   renderCalendarDays();
@@ -1956,12 +2226,12 @@ function renderCalendarDays() {
     const dayCell = document.createElement("div");
     dayCell.className = "day-cell";
     
-    // ⭐ NEW: Highlight real current day (using browser's real date, not simulated)
     const realTodayDate = getRealCurrentDate();
     const isToday = realTodayDate === day.date;
-    if (isToday) {
-      dayCell.classList.add("today-cell");
-    }
+    if (isToday) dayCell.classList.add("today-cell");
+    if (isPlanPast(day.date)) dayCell.classList.add("past-day");
+    if (isPlanFuture(day.date)) dayCell.classList.add("future-day");
+    if (day.isIndia) dayCell.classList.add("travel-day");
     
     // Color load meter
     const totalScheduled = day.tasks.reduce((sum, t) => sum + t.duration, 0);
@@ -1976,8 +2246,8 @@ function renderCalendarDays() {
 
     // Check if there are uncompleted tasks in the past
     // E.g. warning icon on cell
-    const isPast = day.date < (appState.settings.lastRolloverDay || START_DATE_STR);
-    const hasUnfinishedPast = isPast && day.tasks.some(t => !t.completed);
+    const isPast = isPlanPast(day.date);
+    const hasUnfinishedPast = isPast && day.tasks.some(t => !t.completed && !t.fixed);
     
     const warningIconHtml = hasUnfinishedPast ? 
       `<span class="cell-warning-icon" title="Uncompleted tasks! Click rollover.">⚠️</span>` : '';
@@ -1987,7 +2257,7 @@ function renderCalendarDays() {
     
     dayCell.innerHTML = `
       <div class="day-header-info">
-        <span class="day-number">${dayNum}</span>
+        <span class="day-number">${dayNum}${isToday ? '<span class="today-badge">Today</span>' : ''}</span>
         <span class="day-capacity-badge">${displayCap}h Max</span>
       </div>
       <div class="day-load-meter">
@@ -2086,11 +2356,19 @@ function showDayDetails(dateStr) {
         ? `<button class="task-delete-btn" title="Delete task">✕</button>`
         : '';
       
-      // ⭐ NEW: Check if task has notes
       const taskNotes = getTaskNotes(task.id);
-      const hasNotes = taskNotes && taskNotes.text;
+      const hasNotes = taskHasNotes(task.id);
       const notesIndicator = hasNotes ? `<span class="task-notes-indicator" title="Has notes">📝</span>` : '';
       const notesBtn = `<button class="task-notes-btn" title="Edit notes">📝</button>`;
+      const statusBadge = task.status && task.status !== "done" ? `<span class="task-status-badge status-${task.status}">${task.status}</span>` : '';
+      const ownerBadge = task.owner ? `<span class="owner-badge owner-${task.owner}">${task.owner === "shared" ? "Shared" : task.owner === "tejaswi" ? "Tejaswi" : "Thanishka"}</span>` : '';
+      const actionsHtml = task.completed ? '' : `
+        <div class="task-actions-row">
+          <button class="task-action-btn" data-action="partial" title="Partial completion">Partial</button>
+          <button class="task-action-btn" data-action="tomorrow" title="Move to tomorrow">Tomorrow</button>
+          <button class="task-action-btn" data-action="skip" title="Skip">Skip</button>
+          <button class="task-action-btn" data-action="blocked" title="Blocked">Blocked</button>
+        </div>`;
       
       itemRow.innerHTML = `
         <label class="checkbox-container">
@@ -2098,11 +2376,12 @@ function showDayDetails(dateStr) {
           <span class="custom-checkbox"></span>
         </label>
         <div class="task-details">
-          <span class="task-label">${task.title}${notesIndicator}</span>
+          <span class="task-label">${task.title}${notesIndicator}${statusBadge}${ownerBadge}</span>
           <div class="task-sub-meta">
-            <span class="task-cat-badge badge-${task.category}">${task.category}</span>
-            <span>Est: ${task.duration} hr${task.duration > 1 ? 's' : ''}</span>
+            <span class="task-cat-badge badge-${task.category}">${getCategoryLabel(task.category)}</span>
+            <span>Est: ${task.duration} hr${task.duration > 1 ? 's' : ''}${task.completedMinutes ? ` · ${(task.completedMinutes/60).toFixed(1)}h done` : ''}</span>
           </div>
+          ${actionsHtml}
         </div>
         ${linkHtml}
         ${notesBtn}
@@ -2114,6 +2393,26 @@ function showDayDetails(dateStr) {
         playSynthSound("click");
         showTaskNotesModal(task.id, task.title);
       });
+
+      // Task action buttons (browser only)
+      if (typeof itemRow.querySelectorAll === "function") {
+        itemRow.querySelectorAll(".task-action-btn").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const action = btn.getAttribute("data-action");
+            if (action === "partial") {
+              const hrs = prompt(`How many hours completed? (of ${task.duration}h)`, String((task.completedMinutes || 0) / 60 || task.duration / 2));
+              if (hrs != null) markTaskPartial(task, day, parseFloat(hrs));
+            } else if (action === "tomorrow") moveTaskToTomorrow(task, day);
+            else if (action === "skip") skipTask(task, day);
+            else if (action === "blocked") blockTask(task, day);
+            showDayDetails(dateStr);
+            renderTodaySection();
+            renderDashboardMetrics();
+            renderCalendarDays();
+          });
+        });
+      }
 
       // Delete button for custom tasks
       if (isCustom) {
@@ -2341,6 +2640,20 @@ function goToToday() {
   }, 100);
 }
 
+// Expose for export.js
+window.planToday = planToday;
+window.getRealCurrentDate = getRealCurrentDate;
+window.getAllCategories = getAllCategories;
+window.getCategoryLabel = getCategoryLabel;
+window.openCategoryManager = openCategoryManager;
+window.editCategory = editCategory;
+window.saveCategoryEdit = saveCategoryEdit;
+window.addNewCategory = addNewCategory;
+window.archiveCategory = archiveCategory;
+window.deleteCategory = deleteCategory;
+window.showDayDetails = showDayDetails;
+window.addNewExtracurricular = addNewExtracurricular;
+
 // 12. EVENT LISTENERS & SETUP
 document.addEventListener("DOMContentLoaded", () => {
   // Load local storage state
@@ -2397,6 +2710,10 @@ document.addEventListener("DOMContentLoaded", () => {
     maxHoursInput.value = appState.settings.maxNormalDailyHours;
     maxHoursVal.innerText = appState.settings.maxNormalDailyHours;
     document.getElementById("settings-palana-toggle").checked = appState.settings.palanaEnabled;
+    const palSec = document.getElementById("settings-palana-security-toggle");
+    if (palSec) palSec.checked = appState.settings.palanaSecurityEnabled;
+    const ahfTarget = document.getElementById("settings-ahf-weekly");
+    if (ahfTarget) ahfTarget.value = appState.settings.ahfWeeklyTarget || 7;
     document.getElementById("settings-aws-passed").checked = appState.settings.awsExamPassed;
     document.getElementById("settings-secplus-passed").checked = appState.settings.securityPlusExamPassed;
     
@@ -2424,6 +2741,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Apply options to state
     appState.settings.maxNormalDailyHours = parseFloat(maxHoursInput.value);
     appState.settings.palanaEnabled = document.getElementById("settings-palana-toggle").checked;
+    const palSec = document.getElementById("settings-palana-security-toggle");
+    if (palSec) appState.settings.palanaSecurityEnabled = palSec.checked;
+    const ahfTarget = document.getElementById("settings-ahf-weekly");
+    if (ahfTarget) appState.settings.ahfWeeklyTarget = parseFloat(ahfTarget.value) || 7;
     appState.settings.awsExamPassed = document.getElementById("settings-aws-passed").checked;
     appState.settings.securityPlusExamPassed = document.getElementById("settings-secplus-passed").checked;
     
@@ -2454,10 +2775,30 @@ document.addEventListener("DOMContentLoaded", () => {
     goToTodayBtn.addEventListener("click", goToToday);
   }
   
-  // ⭐ NEW: Auto-open the month containing today on page load
+  // ⭐ Auto-open the month containing today on page load
   const realTodayDate = getRealCurrentDate();
-  const todayMonth = realTodayDate.substring(0, 7);
-  activeMonth = todayMonth;
+  activeMonth = realTodayDate.substring(0, 7);
   renderCalendarMonthControls();
   renderCalendarDays();
+
+  // Refresh today highlight after midnight (LA timezone)
+  setInterval(() => {
+    const nowToday = getRealCurrentDate();
+    if (nowToday !== realTodayDate) {
+      activeMonth = nowToday.substring(0, 7);
+      initUI();
+    }
+  }, 60000);
+
+  // Category manager button
+  const catMgrBtn = document.getElementById("open-category-manager-btn");
+  if (catMgrBtn) catMgrBtn.addEventListener("click", openCategoryManager);
+
+  const palanaSecToggle = document.getElementById("settings-palana-security-toggle");
+  if (palanaSecToggle) {
+    palanaSecToggle.addEventListener("change", (e) => {
+      appState.settings.palanaSecurityEnabled = e.target.checked;
+      reflowRemainingCurriculum();
+    });
+  }
 });

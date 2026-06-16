@@ -2408,3 +2408,61 @@ input:checked + .slider:before {
   transform: scale(1.15);
 }
 
+/* Today section, calendar day states, categories, task actions */
+.today-section { margin: 1rem 0; padding: 1rem 1.25rem; }
+.today-section-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.75rem; }
+.today-section-header h3 { margin: 0; font-size: 1rem; color: var(--neon-cyan); }
+.today-stats { font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); }
+.today-task-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.today-task-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.65rem; border-radius: 8px; background: rgba(255,255,255,0.04); cursor: pointer; border-left: 3px solid var(--neon-purple); }
+.today-task-row:hover { background: rgba(255,255,255,0.08); }
+.today-cat-badge { font-size: 0.65rem; white-space: nowrap; padding: 0.15rem 0.4rem; border: 1px solid; border-radius: 4px; }
+.today-task-title { flex: 1; font-size: 0.8rem; }
+.today-task-dur { font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); }
+.today-all-done { color: var(--neon-green); font-size: 0.85rem; }
+.notes-dot, .fixed-badge { font-size: 0.65rem; }
+
+.day-cell.today-cell { outline: 2px solid var(--neon-cyan); box-shadow: 0 0 12px rgba(0, 255, 255, 0.35); }
+.today-badge { display: inline-block; margin-left: 4px; font-size: 0.55rem; background: var(--neon-cyan); color: #000; padding: 1px 4px; border-radius: 3px; font-weight: 700; vertical-align: middle; }
+.day-cell.past-day { opacity: 0.85; }
+.day-cell.past-day .day-number { color: var(--text-muted); }
+.day-cell.future-day { opacity: 0.95; }
+.day-cell.travel-day { background: rgba(135, 206, 235, 0.08); }
+
+.extracurricular-dashboard-section { margin: 1.5rem 0 2rem; padding: 1rem 1.25rem; }
+.category-manager-btn { margin-top: 0.75rem; width: 100%; padding: 0.5rem; background: rgba(107, 45, 140, 0.3); border: 1px dashed var(--neon-purple); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-size: 0.75rem; }
+.category-manager-btn:hover { background: rgba(107, 45, 140, 0.5); }
+.category-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 240px; overflow-y: auto; margin-bottom: 1rem; }
+.category-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 0.8rem; }
+.category-row.archived { opacity: 0.5; }
+.cat-name { flex: 1; font-weight: 600; }
+.cat-meta { font-size: 0.65rem; color: var(--text-muted); }
+
+.task-actions-row { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.35rem; }
+.task-action-btn { font-size: 0.6rem; padding: 0.15rem 0.4rem; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.3); color: var(--text-muted); border-radius: 4px; cursor: pointer; }
+.task-action-btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+.task-status-badge { font-size: 0.6rem; padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.3rem; }
+.status-partial { background: rgba(255, 244, 204, 0.2); color: #ffd700; }
+.status-skipped { background: rgba(128,128,128,0.2); color: #aaa; }
+.status-blocked { background: rgba(255,0,0,0.15); color: #ff6b6b; }
+.owner-badge { font-size: 0.55rem; padding: 0.1rem 0.3rem; border-radius: 3px; margin-left: 0.25rem; background: rgba(255,234,121,0.15); color: #ffea79; }
+
+.day-task-block.cat-winfo { background: #90EE90; color: #1a3d1a; }
+.day-task-block.cat-mentor { background: #FFD700; color: #3d3d00; }
+.day-task-block.cat-palana_security { background: #FF6B6B; color: #fff; }
+.day-task-block.cat-travel { background: #87CEEB; }
+.badge-winfo, .badge-mentor, .badge-palana_security, .badge-travel { font-size: 0.6rem; }
+
+.notes-field { margin-bottom: 0.75rem; }
+.notes-field label { display: block; font-size: 0.7rem; color: var(--neon-purple); margin-bottom: 0.25rem; }
+.notes-sm { min-height: 48px; }
+
+.dot-winfo { background: #90EE90; }
+.dot-mentor { background: #FFD700; }
+
+@media (max-width: 768px) {
+  .today-section-header { flex-direction: column; }
+  .extracurricular-summary { grid-template-columns: 1fr; }
+  .task-actions-row { gap: 0.15rem; }
+}
+
