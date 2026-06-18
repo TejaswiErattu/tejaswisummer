@@ -2800,8 +2800,6 @@ window.getRealCurrentDate = getRealCurrentDate;
 window.getAllCategories = getAllCategories;
 window.getCategoryLabel = getCategoryLabel;
 window.openCategoryManager = openCategoryManager;
-window.editCategory = editCategory;
-window.saveCategoryEdit = saveCategoryEdit;
 window.addNewCategory = addNewCategory;
 window.archiveCategory = archiveCategory;
 window.deleteCategory = deleteCategory;
@@ -2809,7 +2807,7 @@ window.showDayDetails = showDayDetails;
 window.addNewExtracurricular = addNewExtracurricular;
 
 // 12. EVENT LISTENERS & SETUP
-document.addEventListener("DOMContentLoaded", () => {
+function bootApp() {
   // Load local storage state
   loadState();
   migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
@@ -2964,4 +2962,13 @@ document.addEventListener("DOMContentLoaded", () => {
       reflowRemainingCurriculum();
     });
   }
-});
+}
+
+// Run boot immediately if the DOM is already parsed (scripts at end of body
+// can execute after DOMContentLoaded has already fired, in which case a
+// DOMContentLoaded listener would never run — leaving every button dead).
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootApp);
+} else {
+  bootApp();
+}
