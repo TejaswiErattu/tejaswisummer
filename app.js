@@ -1987,12 +1987,18 @@ function resetPlannerState() {
 
 // 10. SYNTH AUDIO FOR RETRO HACKER CHIMES
 // Creates offline sound pulses using Web Audio API
+let _sharedAudioCtx = null;
 function playSynthSound(type) {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    // Reuse ONE AudioContext for the whole session. Creating a new one per
+    // click leaks contexts and crashes the tab once the browser's hard cap
+    // (~6) is hit.
+    if (!_sharedAudioCtx) _sharedAudioCtx = new AudioContextClass();
+    const ctx = _sharedAudioCtx;
+    if (ctx.state === "suspended") ctx.resume();
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
