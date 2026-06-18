@@ -1471,11 +1471,16 @@ function showTaskNotesModal(taskId, taskTitle) {
   const updatedEl = document.getElementById("task-notes-updated");
   if (updatedEl) updatedEl.textContent = notes.lastUpdated ? "Last updated: " + new Date(notes.lastUpdated).toLocaleString() : "";
 
+  const closeNotesModal = () => {
+    modal.classList.remove("open");
+    document.getElementById("overlay-backdrop").classList.remove("active");
+  };
+
   saveBtn.onclick = () => {
     const noteObj = {};
     fields.forEach((id, i) => { const el = document.getElementById(id); noteObj[keys[i]] = el ? el.value : ""; });
     saveTaskNote(taskId, noteObj);
-    modal.classList.remove("open");
+    closeNotesModal();
     playSynthSound("success");
     if (selectedDate) showDayDetails(selectedDate);
     renderTodaySection();
@@ -1484,18 +1489,25 @@ function showTaskNotesModal(taskId, taskTitle) {
   deleteBtn.onclick = () => {
     if (confirm("Delete notes for this task?")) {
       deleteTaskNote(taskId);
-      modal.classList.remove("open");
+      closeNotesModal();
       playSynthSound("click");
     }
   };
 
   modal.classList.add("open");
+  document.getElementById("overlay-backdrop").classList.add("active");
 }
 
 // ── Category management ──────────────────────────────────────────────────────
 function openCategoryManager() {
   renderCategoryList();
-  document.getElementById("category-modal").style.display = "flex";
+  document.getElementById("category-modal").classList.add("open");
+  document.getElementById("overlay-backdrop").classList.add("active");
+}
+
+function closeCategoryManager() {
+  document.getElementById("category-modal").classList.remove("open");
+  document.getElementById("overlay-backdrop").classList.remove("active");
 }
 
 function renderCategoryList() {
@@ -1775,11 +1787,13 @@ function editExtracurricular(idx) {
     };
     saveState();
     modal.classList.remove("open");
+    document.getElementById("overlay-backdrop").classList.remove("active");
     renderExtracurricularSummary();
     playSynthSound("success");
   };
 
   modal.classList.add("open");
+  document.getElementById("overlay-backdrop").classList.add("active");
 }
 
 function deleteExtracurricular(idx) {
@@ -1811,6 +1825,7 @@ function addNewExtracurricular() {
       appState.extracurriculars.push(newEc);
       saveState();
       modal.classList.remove("open");
+      document.getElementById("overlay-backdrop").classList.remove("active");
       renderExtracurricularSummary();
       playSynthSound("success");
     } else {
@@ -2306,20 +2321,47 @@ function renderCalendarDays() {
     const dotsContainer = dayCell.querySelector(".day-tasks-dots");
     // Sort tasks so completed ones are pushed to bottom
     const sortedTasks = [...day.tasks].sort((a,b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
-    
+
     sortedTasks.forEach(task => {
       const block = document.createElement("div");
       block.className = `day-task-block cat-${task.category} ${task.completed ? 'task-completed' : ''}`;
       block.innerText = task.title;
       dotsContainer.appendChild(block);
     });
-    
+
+    // Drop target: accept tasks dragged from the drawer
+    dayCell.addEventListener('dragover', (e) => {
+      if (window._dragTask) {
+        e.preventDefault();
+        dayCell.classList.add("drag-over");
+      }
+    });
+    dayCell.addEventListener('dragleave', () => dayCell.classList.remove("drag-over"));
+    dayCell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dayCell.classList.remove("drag-over");
+      const { task, fromDate } = window._dragTask || {};
+      if (!task || fromDate === day.date) return;
+      const fromDay = appState.days.find(d => d.date === fromDate);
+      if (!fromDay) return;
+      fromDay.tasks = fromDay.tasks.filter(t => t.id !== task.id);
+      task.originalDate = task.originalDate || fromDate;
+      task.rescheduleCount = (task.rescheduleCount || 0) + 1;
+      task.id = `${day.date}_moved_${Date.now()}_${task.category}`;
+      day.tasks.push(task);
+      saveState();
+      initUI();
+      showDayDetails(day.date);
+      playSynthSound("success");
+      window._dragTask = null;
+    });
+
     // Click action opens drawer
     dayCell.addEventListener('click', () => {
       playSynthSound("click");
       showDayDetails(day.date);
     });
-    
+
     container.appendChild(dayCell);
   });
 }
@@ -2380,6 +2422,17 @@ function showDayDetails(dateStr) {
     day.tasks.forEach(task => {
       const itemRow = document.createElement("div");
       itemRow.className = `drawer-task-item ${task.completed ? 'task-checked' : ''}`;
+      itemRow.draggable = true;
+      itemRow.title = "Drag to a calendar day to move this task";
+      itemRow.addEventListener('dragstart', (e) => {
+        window._dragTask = { task, fromDate: dateStr };
+        itemRow.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+      });
+      itemRow.addEventListener('dragend', () => {
+        itemRow.classList.remove("dragging");
+        document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
+      });
       
       const linkHtml = task.link ? 
         `<a href="${task.link}" target="_blank" class="task-link-arrow" title="View Reference Link">&rarr;</a>` : '';
@@ -2702,6 +2755,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("overlay-backdrop").addEventListener("click", () => {
     closeDrawer();
     closeSettings();
+    closeCategoryManager();
+    document.getElementById("task-notes-modal").classList.remove("open");
+    document.getElementById("extracurricular-modal").classList.remove("open");
+    document.getElementById("overlay-backdrop").classList.remove("active");
   });
   
   // 2. Drawer actions
