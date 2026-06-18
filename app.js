@@ -1471,16 +1471,11 @@ function showTaskNotesModal(taskId, taskTitle) {
   const updatedEl = document.getElementById("task-notes-updated");
   if (updatedEl) updatedEl.textContent = notes.lastUpdated ? "Last updated: " + new Date(notes.lastUpdated).toLocaleString() : "";
 
-  const closeNotesModal = () => {
-    modal.classList.remove("open");
-    document.getElementById("overlay-backdrop").classList.remove("active");
-  };
-
   saveBtn.onclick = () => {
     const noteObj = {};
     fields.forEach((id, i) => { const el = document.getElementById(id); noteObj[keys[i]] = el ? el.value : ""; });
     saveTaskNote(taskId, noteObj);
-    closeNotesModal();
+    modal.classList.remove("open");
     playSynthSound("success");
     if (selectedDate) showDayDetails(selectedDate);
     renderTodaySection();
@@ -1489,25 +1484,18 @@ function showTaskNotesModal(taskId, taskTitle) {
   deleteBtn.onclick = () => {
     if (confirm("Delete notes for this task?")) {
       deleteTaskNote(taskId);
-      closeNotesModal();
+      modal.classList.remove("open");
       playSynthSound("click");
     }
   };
 
   modal.classList.add("open");
-  document.getElementById("overlay-backdrop").classList.add("active");
 }
 
 // ── Category management ──────────────────────────────────────────────────────
 function openCategoryManager() {
   renderCategoryList();
-  document.getElementById("category-modal").classList.add("open");
-  document.getElementById("overlay-backdrop").classList.add("active");
-}
-
-function closeCategoryManager() {
-  document.getElementById("category-modal").classList.remove("open");
-  document.getElementById("overlay-backdrop").classList.remove("active");
+  document.getElementById("category-modal").style.display = "flex";
 }
 
 function renderCategoryList() {
@@ -1515,123 +1503,78 @@ function renderCategoryList() {
   if (!list) return;
   const cats = getAllCategories();
   const sorted = Object.values(cats).sort((a, b) => (a.order || a.priority || 99) - (b.order || b.priority || 99));
-  list.innerHTML = "";
+  list.innerHTML = sorted.map(cat => `
+    <div class="category-row ${cat.archived ? 'archived' : ''}" data-id="${cat.id}">
+      <span class="cat-icon" style="color:${cat.color}">${cat.icon}</span>
+      <span class="cat-name">${cat.name}</span>
+      <span class="cat-meta">${cat.weeklyTarget || 0}h/wk · ${cat.required ? "Required" : "Optional"}</span>
+      ${cat.builtIn ? `<button class="action-btn" onclick="editCategory('${cat.id}', true)">View</button>` :
+        `<button class="action-btn" onclick="editCategory('${cat.id}', false)">Edit</button>
+         <button class="action-btn" onclick="archiveCategory('${cat.id}')">${cat.archived ? "Restore" : "Archive"}</button>
+         <button class="action-btn delete-btn" onclick="deleteCategory('${cat.id}')">Delete</button>`}
+    </div>
+  `).join("");
+}
 
-  sorted.forEach(cat => {
-    const row = document.createElement("div");
-    row.className = `cat-row ${cat.archived ? "cat-archived" : ""}`;
-    row.dataset.id = cat.id;
-
-    row.innerHTML = `
-      <div class="cat-row-summary">
-        <span class="cat-color-dot" style="background:${cat.color}"></span>
-        <span class="cat-row-icon">${cat.icon}</span>
-        <span class="cat-row-name">${cat.name}</span>
-        <span class="cat-row-meta">${cat.weeklyTarget || 0}h/wk</span>
-        ${cat.required ? '<span class="cat-required-badge">Required</span>' : ""}
-        ${cat.archived ? '<span class="cat-archived-badge">Archived</span>' : ""}
-        <button class="cat-edit-toggle" title="Edit">✎</button>
-        ${!cat.builtIn ? `<button class="cat-delete-btn" title="Delete">✕</button>` : ""}
-      </div>
-      <div class="cat-edit-inline" style="display:none">
-        <div class="cat-edit-row">
-          <label>Color</label>
-          <input type="color" class="cat-inline-color" value="${cat.color}">
-        </div>
-        <div class="cat-edit-row">
-          <label>Icon</label>
-          <input type="text" class="cat-inline-icon form-input" value="${cat.icon}" maxlength="4">
-        </div>
-        ${!cat.builtIn ? `
-        <div class="cat-edit-row">
-          <label>Name</label>
-          <input type="text" class="cat-inline-name form-input" value="${cat.name}">
-        </div>` : ""}
-        <div class="cat-edit-row">
-          <label>h/wk</label>
-          <input type="number" class="cat-inline-weekly form-input" value="${cat.weeklyTarget || 0}" min="0" step="0.5">
-        </div>
-        <div class="cat-edit-actions">
-          ${!cat.builtIn ? `<button class="cat-archive-btn">${cat.archived ? "Restore" : "Archive"}</button>` : ""}
-          <button class="cat-save-btn">Save</button>
-        </div>
-      </div>
-    `;
-
-    // Toggle edit panel
-    row.querySelector(".cat-edit-toggle").addEventListener("click", () => {
-      const panel = row.querySelector(".cat-edit-inline");
-      const isOpen = panel.style.display !== "none";
-      // Close all others
-      list.querySelectorAll(".cat-edit-inline").forEach(p => p.style.display = "none");
-      panel.style.display = isOpen ? "none" : "block";
-    });
-
-    // Live color preview on the dot
-    const colorInput = row.querySelector(".cat-inline-color");
-    const dot = row.querySelector(".cat-color-dot");
-    colorInput.addEventListener("input", () => { dot.style.background = colorInput.value; });
-
-    // Save
-    row.querySelector(".cat-save-btn").addEventListener("click", () => {
-      const color = row.querySelector(".cat-inline-color").value;
-      const icon = row.querySelector(".cat-inline-icon").value || cat.icon;
-      const weekly = parseFloat(row.querySelector(".cat-inline-weekly").value) || 0;
-
-      if (cat.builtIn) {
-        // Persist color + icon overrides for built-ins in appState
-        appState.categoryOverrides = appState.categoryOverrides || {};
-        appState.categoryOverrides[cat.id] = { color, icon, weeklyTarget: weekly };
-        BUILT_IN_CATEGORIES[cat.id].color = color;
-        BUILT_IN_CATEGORIES[cat.id].icon = icon;
-        BUILT_IN_CATEGORIES[cat.id].weeklyTarget = weekly;
-      } else {
-        const nameEl = row.querySelector(".cat-inline-name");
-        appState.categories[cat.id] = Object.assign({}, appState.categories[cat.id], {
-          color, icon, weeklyTarget: weekly,
-          name: nameEl ? nameEl.value || cat.name : cat.name
-        });
-      }
-      saveState();
-      renderCategoryList();
-      renderCalendarDays();
-      populateCategorySelects();
-      playSynthSound("success");
-    });
-
-    // Archive toggle
-    const archiveBtn = row.querySelector(".cat-archive-btn");
-    if (archiveBtn) {
-      archiveBtn.addEventListener("click", () => {
-        appState.categories[cat.id].archived = !appState.categories[cat.id].archived;
-        saveState();
-        renderCategoryList();
-      });
-    }
-
-    // Delete
-    const deleteBtn = row.querySelector(".cat-delete-btn");
-    if (deleteBtn) {
-      deleteBtn.addEventListener("click", () => deleteCategory(cat.id));
-    }
-
-    list.appendChild(row);
+function editCategory(catId, readOnly) {
+  const cat = getCategoryDef(catId);
+  document.getElementById("cat-edit-id").value = catId;
+  document.getElementById("cat-edit-name").value = cat.name || "";
+  document.getElementById("cat-edit-icon").value = cat.icon || "✨";
+  document.getElementById("cat-edit-color").value = cat.color || "#ffffff";
+  document.getElementById("cat-edit-desc").value = cat.description || "";
+  document.getElementById("cat-edit-weekly").value = cat.weeklyTarget || 0;
+  document.getElementById("cat-edit-required").checked = !!cat.required;
+  document.getElementById("cat-edit-priority").value = cat.priority || cat.order || 99;
+  document.getElementById("cat-edit-export").checked = cat.exportEnabled !== false;
+  ["cat-edit-name","cat-edit-icon","cat-edit-color","cat-edit-desc","cat-edit-weekly","cat-edit-priority"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = readOnly && cat.builtIn;
   });
+  document.getElementById("category-edit-panel").style.display = "block";
+}
+
+function saveCategoryEdit() {
+  const catId = document.getElementById("cat-edit-id").value;
+  if (!catId) return;
+  const builtIn = BUILT_IN_CATEGORIES[catId];
+  if (builtIn) {
+    builtIn.weeklyTarget = parseFloat(document.getElementById("cat-edit-weekly").value) || builtIn.weeklyTarget;
+    saveState();
+  } else {
+    appState.categories[catId] = {
+      id: catId,
+      name: document.getElementById("cat-edit-name").value,
+      icon: document.getElementById("cat-edit-icon").value || "✨",
+      color: document.getElementById("cat-edit-color").value,
+      description: document.getElementById("cat-edit-desc").value,
+      weeklyTarget: parseFloat(document.getElementById("cat-edit-weekly").value) || 0,
+      required: document.getElementById("cat-edit-required").checked,
+      priority: parseInt(document.getElementById("cat-edit-priority").value) || 99,
+      order: parseInt(document.getElementById("cat-edit-priority").value) || 99,
+      exportEnabled: document.getElementById("cat-edit-export").checked,
+      active: true,
+      archived: false
+    };
+    saveState();
+  }
+  renderCategoryList();
+  populateCategorySelects();
+  playSynthSound("success");
 }
 
 function addNewCategory() {
   const name = document.getElementById("cat-new-name").value.trim();
-  if (!name) {
-    document.getElementById("cat-new-name").focus();
-    return;
-  }
+  if (!name) return alert("Enter a category name");
   const id = "custom_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 30) + "_" + Date.now();
   appState.categories[id] = {
     id, name,
     icon: document.getElementById("cat-new-icon").value || "✨",
-    color: document.getElementById("cat-new-color").value || "#c5b3fa",
+    color: document.getElementById("cat-new-color").value || "#ffffff",
+    description: document.getElementById("cat-new-desc").value || "",
     weeklyTarget: parseFloat(document.getElementById("cat-new-weekly").value) || 0,
-    priority: 50, order: 50,
+    required: document.getElementById("cat-new-required").checked,
+    priority: parseInt(document.getElementById("cat-new-priority").value) || 50,
+    order: parseInt(document.getElementById("cat-new-priority").value) || 50,
     exportEnabled: true, active: true, archived: false
   };
   saveState();
@@ -1706,8 +1649,8 @@ function moveTaskToTomorrow(task, day) {
   led.count++; led.lastMovedFrom = day.date; led.movedOn = planToday();
   appState.rescheduleLedger[key] = led;
   saveState();
+  initUI();
   showDayDetails(tomorrow.date);
-  refreshUI();
 }
 
 function skipTask(task, day) {
@@ -1832,13 +1775,11 @@ function editExtracurricular(idx) {
     };
     saveState();
     modal.classList.remove("open");
-    document.getElementById("overlay-backdrop").classList.remove("active");
     renderExtracurricularSummary();
     playSynthSound("success");
   };
 
   modal.classList.add("open");
-  document.getElementById("overlay-backdrop").classList.add("active");
 }
 
 function deleteExtracurricular(idx) {
@@ -1870,7 +1811,6 @@ function addNewExtracurricular() {
       appState.extracurriculars.push(newEc);
       saveState();
       modal.classList.remove("open");
-      document.getElementById("overlay-backdrop").classList.remove("active");
       renderExtracurricularSummary();
       playSynthSound("success");
     } else {
@@ -1881,21 +1821,12 @@ function addNewExtracurricular() {
   modal.classList.add("open");
 }
 
-let _saveTimer = null;
 function saveState() {
-  // Debounce: collapse rapid sequential saves into one write
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(() => {
-    // Strip transient undo snapshot before persisting — it's a full copy of
-    // all days and would bloat localStorage and exceed Firestore's 1MB limit
-    const { rolloverUndoSnapshot, ...persistable } = appState;
-    const serialized = JSON.stringify(persistable);
-    localStorage.setItem("cyber_study_plan_state_2026", serialized);
-    if (typeof saveStateToFirestore === "function" && currentUser) {
-      saveStateToFirestore();
-    }
-  }, 80);
-}
+  localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+  // Also sync to Firebase cloud if user is signed in
+  if (typeof saveStateToFirestore === "function" && currentUser) {
+    saveStateToFirestore();
+  }
 }
 
 function loadState() {
@@ -1909,12 +1840,6 @@ function loadState() {
       }
       // ⭐ NEW: Migrate from simulated today to real today
       migrateToRealCurrentDate();
-      // Re-apply any saved color/icon overrides for built-in categories
-      if (appState.categoryOverrides) {
-        Object.entries(appState.categoryOverrides).forEach(([id, ov]) => {
-          if (BUILT_IN_CATEGORIES[id]) Object.assign(BUILT_IN_CATEGORIES[id], ov);
-        });
-      }
     } catch (e) {
       console.error("Failed to parse state, generating new.", e);
       generateNewState();
@@ -2082,19 +2007,6 @@ function spawnSparkles(e) {
 // 11. UI RENDERING & COMPONENT BUILDERS
 let activeMonth = "2026-06"; // Current calendar viewing month
 let selectedDate = null;     // Date open in side drawer
-
-let _calRenderTimer = null;
-function renderCalendarDaysDebounced() {
-  clearTimeout(_calRenderTimer);
-  _calRenderTimer = setTimeout(renderCalendarDays, 60);
-}
-
-// Lightweight refresh — only the parts that change on a typical task action
-function refreshUI() {
-  renderDashboardMetrics();
-  renderTodaySection();
-  renderCalendarDaysDebounced();
-}
 
 function initUI() {
   initializeExtracurriculars();
@@ -2394,47 +2306,20 @@ function renderCalendarDays() {
     const dotsContainer = dayCell.querySelector(".day-tasks-dots");
     // Sort tasks so completed ones are pushed to bottom
     const sortedTasks = [...day.tasks].sort((a,b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
-
+    
     sortedTasks.forEach(task => {
       const block = document.createElement("div");
       block.className = `day-task-block cat-${task.category} ${task.completed ? 'task-completed' : ''}`;
       block.innerText = task.title;
       dotsContainer.appendChild(block);
     });
-
-    // Drop target: accept tasks dragged from the drawer
-    dayCell.addEventListener('dragover', (e) => {
-      if (window._dragTask) {
-        e.preventDefault();
-        dayCell.classList.add("drag-over");
-      }
-    });
-    dayCell.addEventListener('dragleave', () => dayCell.classList.remove("drag-over"));
-    dayCell.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dayCell.classList.remove("drag-over");
-      const { task, fromDate } = window._dragTask || {};
-      if (!task || fromDate === day.date) return;
-      const fromDay = appState.days.find(d => d.date === fromDate);
-      if (!fromDay) return;
-      fromDay.tasks = fromDay.tasks.filter(t => t.id !== task.id);
-      task.originalDate = task.originalDate || fromDate;
-      task.rescheduleCount = (task.rescheduleCount || 0) + 1;
-      task.id = `${day.date}_moved_${Date.now()}_${task.category}`;
-      day.tasks.push(task);
-      saveState();
-      showDayDetails(day.date);
-      refreshUI();
-      playSynthSound("success");
-      window._dragTask = null;
-    });
-
+    
     // Click action opens drawer
     dayCell.addEventListener('click', () => {
       playSynthSound("click");
       showDayDetails(day.date);
     });
-
+    
     container.appendChild(dayCell);
   });
 }
@@ -2495,17 +2380,6 @@ function showDayDetails(dateStr) {
     day.tasks.forEach(task => {
       const itemRow = document.createElement("div");
       itemRow.className = `drawer-task-item ${task.completed ? 'task-checked' : ''}`;
-      itemRow.draggable = true;
-      itemRow.title = "Drag to a calendar day to move this task";
-      itemRow.addEventListener('dragstart', (e) => {
-        window._dragTask = { task, fromDate: dateStr };
-        itemRow.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-      });
-      itemRow.addEventListener('dragend', () => {
-        itemRow.classList.remove("dragging");
-        document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
-      });
       
       const linkHtml = task.link ? 
         `<a href="${task.link}" target="_blank" class="task-link-arrow" title="View Reference Link">&rarr;</a>` : '';
@@ -2566,7 +2440,9 @@ function showDayDetails(dateStr) {
             else if (action === "skip") skipTask(task, day);
             else if (action === "blocked") blockTask(task, day);
             showDayDetails(dateStr);
-            refreshUI();
+            renderTodaySection();
+            renderDashboardMetrics();
+            renderCalendarDays();
           });
         });
       }
@@ -2577,8 +2453,9 @@ function showDayDetails(dateStr) {
           playSynthSound("click");
           day.tasks = day.tasks.filter(t => t.id !== task.id);
           saveState();
-          showDayDetails(dateStr);
-          refreshUI();
+          renderDashboardMetrics();
+          renderCalendarDays();
+          showDayDetails(dateStr); // re-render drawer
         });
       }
       
@@ -2598,8 +2475,11 @@ function showDayDetails(dateStr) {
           playSynthSound("click");
         }
         saveState();
+        
+        // Re-draw metrics, calendar dots
+        renderDashboardMetrics();
+        renderCalendarDays();
         renderTracksChecklists();
-        refreshUI();
         
         // Refresh drawer metrics
         const newTotal = day.tasks.reduce((sum, t) => sum + t.duration, 0);
@@ -2650,8 +2530,11 @@ function showDayDetails(dateStr) {
     playSynthSound("success");
     titleInput.value = "";
     durationInput.value = "1";
-    showDayDetails(dateStr);
-    refreshUI();
+
+    // Re-render everything
+    renderDashboardMetrics();
+    renderCalendarDays();
+    showDayDetails(dateStr); // re-render drawer with new task
   });
 
   // Show undo button if a rollover snapshot exists for this day
@@ -2819,10 +2702,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("overlay-backdrop").addEventListener("click", () => {
     closeDrawer();
     closeSettings();
-    closeCategoryManager();
-    document.getElementById("task-notes-modal").classList.remove("open");
-    document.getElementById("extracurricular-modal").classList.remove("open");
-    document.getElementById("overlay-backdrop").classList.remove("active");
   });
   
   // 2. Drawer actions
