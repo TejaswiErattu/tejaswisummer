@@ -42,6 +42,9 @@ auth.onAuthStateChanged(async (user) => {
     if (typeof migrateScheduleIfNeeded === "function") {
       migrateScheduleIfNeeded(); // upgrade older cloud schedules (adds Palana onboarding prep)
     }
+    if (typeof applyCategoryColors === "function") {
+      applyCategoryColors(); // sync edited category colors from cloud state into CSS vars
+    }
     initUI();
     showAuthToast(`Synced ☁️ Welcome back, ${user.displayName?.split(' ')[0] || 'hacker'}!`, "success");
   }

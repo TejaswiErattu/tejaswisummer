@@ -648,6 +648,18 @@ function getAllCategories() {
   return merged;
 }
 
+// Push each category's color into the matching CSS variable (--cat-<id>) so
+// every place that renders a color — calendar dots/blocks, today rows, badges,
+// legend, track borders — updates at once when a color is edited.
+function applyCategoryColors() {
+  const cats = getAllCategories();
+  Object.values(cats).forEach(cat => {
+    if (cat.id && cat.color) {
+      document.documentElement.style.setProperty(`--cat-${cat.id}`, cat.color);
+    }
+  });
+}
+
 function getCategoryDef(catId) {
   const all = getAllCategories();
   return all[catId] || BUILT_IN_CATEGORIES.custom || { name: catId, icon: "✨", color: "#ffffff" };
@@ -1593,9 +1605,12 @@ function renderCategoryList() {
         });
       }
       saveState();
+      applyCategoryColors();   // update CSS vars so every view recolors
       renderCategoryList();
       renderCalendarDays();
       populateCategorySelects();
+      renderTracksChecklists();
+      renderTodaySection();
       playSynthSound("success");
     });
 
@@ -2811,6 +2826,7 @@ function bootApp() {
   // Load local storage state
   loadState();
   migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
+  applyCategoryColors();     // sync edited category colors into CSS variables
   initUI();
   
   // 1. Overlay click handler
