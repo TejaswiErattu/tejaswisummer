@@ -1886,7 +1886,11 @@ function saveState() {
   // Debounce: collapse rapid sequential saves into one write
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
-    localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+    // Strip transient undo snapshot before persisting — it's a full copy of
+    // all days and would bloat localStorage and exceed Firestore's 1MB limit
+    const { rolloverUndoSnapshot, ...persistable } = appState;
+    const serialized = JSON.stringify(persistable);
+    localStorage.setItem("cyber_study_plan_state_2026", serialized);
     if (typeof saveStateToFirestore === "function" && currentUser) {
       saveStateToFirestore();
     }

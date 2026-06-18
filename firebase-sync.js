@@ -77,22 +77,29 @@ async function loadStateFromFirestore() {
     const doc = await db.collection("users").doc(currentUser.uid).get();
     if (doc.exists && doc.data().state) {
       const cloudState = JSON.parse(doc.data().state);
-      // Validate loaded state
-      if (cloudState && cloudState.days && cloudState.days.length > 0) {
-        appState = cloudState;
-        // Also write to localStorage as local backup
-        localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
-      } else {
-        // Cloud state is empty/corrupt — use local or generate fresh
-        if (!appState.days || appState.days.length === 0) {
-          generateNewState();
+      const cloudValid = cloudState && cloudState.days && cloudState.days.length > 0;
+      const localValid = appState && appState.days && appState.days.length > 0;
+
+      if (cloudValid) {
+        // Cloud wins if it has more completed tasks (more recent progress)
+        const cloudCompleted = cloudState.days.reduce((n, d) => n + d.tasks.filter(t => t.completed).length, 0);
+        const localCompleted = localValid ? appState.days.reduce((n, d) => n + d.tasks.filter(t => t.completed).length, 0) : -1;
+
+        if (cloudCompleted >= localCompleted) {
+          appState = cloudState;
+          localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+        } else {
+          // Local is ahead — push it up to fix the cloud
+          await saveStateToFirestore();
         }
+      } else {
+        // Cloud is empty/corrupt — keep local, re-upload to fix cloud
+        if (!localValid) generateNewState();
+        await saveStateToFirestore();
       }
     } else {
-      // No cloud save yet — upload current local state to cloud
-      if (!appState.days || appState.days.length === 0) {
-        generateNewState();
-      }
+      // No cloud save yet — upload current local state
+      if (!appState.days || appState.days.length === 0) generateNewState();
       await saveStateToFirestore();
     }
   } catch (e) {
