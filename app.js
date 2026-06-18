@@ -1515,78 +1515,123 @@ function renderCategoryList() {
   if (!list) return;
   const cats = getAllCategories();
   const sorted = Object.values(cats).sort((a, b) => (a.order || a.priority || 99) - (b.order || b.priority || 99));
-  list.innerHTML = sorted.map(cat => `
-    <div class="category-row ${cat.archived ? 'archived' : ''}" data-id="${cat.id}">
-      <span class="cat-icon" style="color:${cat.color}">${cat.icon}</span>
-      <span class="cat-name">${cat.name}</span>
-      <span class="cat-meta">${cat.weeklyTarget || 0}h/wk · ${cat.required ? "Required" : "Optional"}</span>
-      ${cat.builtIn ? `<button class="action-btn" onclick="editCategory('${cat.id}', true)">View</button>` :
-        `<button class="action-btn" onclick="editCategory('${cat.id}', false)">Edit</button>
-         <button class="action-btn" onclick="archiveCategory('${cat.id}')">${cat.archived ? "Restore" : "Archive"}</button>
-         <button class="action-btn delete-btn" onclick="deleteCategory('${cat.id}')">Delete</button>`}
-    </div>
-  `).join("");
-}
+  list.innerHTML = "";
 
-function editCategory(catId, readOnly) {
-  const cat = getCategoryDef(catId);
-  document.getElementById("cat-edit-id").value = catId;
-  document.getElementById("cat-edit-name").value = cat.name || "";
-  document.getElementById("cat-edit-icon").value = cat.icon || "✨";
-  document.getElementById("cat-edit-color").value = cat.color || "#ffffff";
-  document.getElementById("cat-edit-desc").value = cat.description || "";
-  document.getElementById("cat-edit-weekly").value = cat.weeklyTarget || 0;
-  document.getElementById("cat-edit-required").checked = !!cat.required;
-  document.getElementById("cat-edit-priority").value = cat.priority || cat.order || 99;
-  document.getElementById("cat-edit-export").checked = cat.exportEnabled !== false;
-  ["cat-edit-name","cat-edit-icon","cat-edit-color","cat-edit-desc","cat-edit-weekly","cat-edit-priority"].forEach(id => {
-    const el = document.getElementById(id); if (el) el.disabled = readOnly && cat.builtIn;
+  sorted.forEach(cat => {
+    const row = document.createElement("div");
+    row.className = `cat-row ${cat.archived ? "cat-archived" : ""}`;
+    row.dataset.id = cat.id;
+
+    row.innerHTML = `
+      <div class="cat-row-summary">
+        <span class="cat-color-dot" style="background:${cat.color}"></span>
+        <span class="cat-row-icon">${cat.icon}</span>
+        <span class="cat-row-name">${cat.name}</span>
+        <span class="cat-row-meta">${cat.weeklyTarget || 0}h/wk</span>
+        ${cat.required ? '<span class="cat-required-badge">Required</span>' : ""}
+        ${cat.archived ? '<span class="cat-archived-badge">Archived</span>' : ""}
+        <button class="cat-edit-toggle" title="Edit">✎</button>
+        ${!cat.builtIn ? `<button class="cat-delete-btn" title="Delete">✕</button>` : ""}
+      </div>
+      <div class="cat-edit-inline" style="display:none">
+        <div class="cat-edit-row">
+          <label>Color</label>
+          <input type="color" class="cat-inline-color" value="${cat.color}">
+        </div>
+        <div class="cat-edit-row">
+          <label>Icon</label>
+          <input type="text" class="cat-inline-icon form-input" value="${cat.icon}" maxlength="4">
+        </div>
+        ${!cat.builtIn ? `
+        <div class="cat-edit-row">
+          <label>Name</label>
+          <input type="text" class="cat-inline-name form-input" value="${cat.name}">
+        </div>` : ""}
+        <div class="cat-edit-row">
+          <label>h/wk</label>
+          <input type="number" class="cat-inline-weekly form-input" value="${cat.weeklyTarget || 0}" min="0" step="0.5">
+        </div>
+        <div class="cat-edit-actions">
+          ${!cat.builtIn ? `<button class="cat-archive-btn">${cat.archived ? "Restore" : "Archive"}</button>` : ""}
+          <button class="cat-save-btn">Save</button>
+        </div>
+      </div>
+    `;
+
+    // Toggle edit panel
+    row.querySelector(".cat-edit-toggle").addEventListener("click", () => {
+      const panel = row.querySelector(".cat-edit-inline");
+      const isOpen = panel.style.display !== "none";
+      // Close all others
+      list.querySelectorAll(".cat-edit-inline").forEach(p => p.style.display = "none");
+      panel.style.display = isOpen ? "none" : "block";
+    });
+
+    // Live color preview on the dot
+    const colorInput = row.querySelector(".cat-inline-color");
+    const dot = row.querySelector(".cat-color-dot");
+    colorInput.addEventListener("input", () => { dot.style.background = colorInput.value; });
+
+    // Save
+    row.querySelector(".cat-save-btn").addEventListener("click", () => {
+      const color = row.querySelector(".cat-inline-color").value;
+      const icon = row.querySelector(".cat-inline-icon").value || cat.icon;
+      const weekly = parseFloat(row.querySelector(".cat-inline-weekly").value) || 0;
+
+      if (cat.builtIn) {
+        // Persist color + icon overrides for built-ins in appState
+        appState.categoryOverrides = appState.categoryOverrides || {};
+        appState.categoryOverrides[cat.id] = { color, icon, weeklyTarget: weekly };
+        BUILT_IN_CATEGORIES[cat.id].color = color;
+        BUILT_IN_CATEGORIES[cat.id].icon = icon;
+        BUILT_IN_CATEGORIES[cat.id].weeklyTarget = weekly;
+      } else {
+        const nameEl = row.querySelector(".cat-inline-name");
+        appState.categories[cat.id] = Object.assign({}, appState.categories[cat.id], {
+          color, icon, weeklyTarget: weekly,
+          name: nameEl ? nameEl.value || cat.name : cat.name
+        });
+      }
+      saveState();
+      renderCategoryList();
+      renderCalendarDays();
+      populateCategorySelects();
+      playSynthSound("success");
+    });
+
+    // Archive toggle
+    const archiveBtn = row.querySelector(".cat-archive-btn");
+    if (archiveBtn) {
+      archiveBtn.addEventListener("click", () => {
+        appState.categories[cat.id].archived = !appState.categories[cat.id].archived;
+        saveState();
+        renderCategoryList();
+      });
+    }
+
+    // Delete
+    const deleteBtn = row.querySelector(".cat-delete-btn");
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => deleteCategory(cat.id));
+    }
+
+    list.appendChild(row);
   });
-  document.getElementById("category-edit-panel").style.display = "block";
-}
-
-function saveCategoryEdit() {
-  const catId = document.getElementById("cat-edit-id").value;
-  if (!catId) return;
-  const builtIn = BUILT_IN_CATEGORIES[catId];
-  if (builtIn) {
-    builtIn.weeklyTarget = parseFloat(document.getElementById("cat-edit-weekly").value) || builtIn.weeklyTarget;
-    saveState();
-  } else {
-    appState.categories[catId] = {
-      id: catId,
-      name: document.getElementById("cat-edit-name").value,
-      icon: document.getElementById("cat-edit-icon").value || "✨",
-      color: document.getElementById("cat-edit-color").value,
-      description: document.getElementById("cat-edit-desc").value,
-      weeklyTarget: parseFloat(document.getElementById("cat-edit-weekly").value) || 0,
-      required: document.getElementById("cat-edit-required").checked,
-      priority: parseInt(document.getElementById("cat-edit-priority").value) || 99,
-      order: parseInt(document.getElementById("cat-edit-priority").value) || 99,
-      exportEnabled: document.getElementById("cat-edit-export").checked,
-      active: true,
-      archived: false
-    };
-    saveState();
-  }
-  renderCategoryList();
-  populateCategorySelects();
-  playSynthSound("success");
 }
 
 function addNewCategory() {
   const name = document.getElementById("cat-new-name").value.trim();
-  if (!name) return alert("Enter a category name");
+  if (!name) {
+    document.getElementById("cat-new-name").focus();
+    return;
+  }
   const id = "custom_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 30) + "_" + Date.now();
   appState.categories[id] = {
     id, name,
     icon: document.getElementById("cat-new-icon").value || "✨",
-    color: document.getElementById("cat-new-color").value || "#ffffff",
-    description: document.getElementById("cat-new-desc").value || "",
+    color: document.getElementById("cat-new-color").value || "#c5b3fa",
     weeklyTarget: parseFloat(document.getElementById("cat-new-weekly").value) || 0,
-    required: document.getElementById("cat-new-required").checked,
-    priority: parseInt(document.getElementById("cat-new-priority").value) || 50,
-    order: parseInt(document.getElementById("cat-new-priority").value) || 50,
+    priority: 50, order: 50,
     exportEnabled: true, active: true, archived: false
   };
   saveState();
@@ -1855,6 +1900,12 @@ function loadState() {
       }
       // ⭐ NEW: Migrate from simulated today to real today
       migrateToRealCurrentDate();
+      // Re-apply any saved color/icon overrides for built-in categories
+      if (appState.categoryOverrides) {
+        Object.entries(appState.categoryOverrides).forEach(([id, ov]) => {
+          if (BUILT_IN_CATEGORIES[id]) Object.assign(BUILT_IN_CATEGORIES[id], ov);
+        });
+      }
     } catch (e) {
       console.error("Failed to parse state, generating new.", e);
       generateNewState();

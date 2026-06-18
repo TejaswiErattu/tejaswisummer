@@ -690,30 +690,18 @@
       <h2>MANAGE_CATEGORIES</h2>
       <button class="close-btn" onclick="closeCategoryManager()">✕</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body cat-modal-body">
       <div id="category-list" class="category-list"></div>
-      <div id="category-edit-panel" class="category-edit-panel" style="display:none">
-        <input type="hidden" id="cat-edit-id">
-        <div class="form-row"><label>Name</label><input id="cat-edit-name" class="form-input"></div>
-        <div class="form-row"><label>Icon</label><input id="cat-edit-icon" class="form-input" maxlength="4"></div>
-        <div class="form-row"><label>Color</label><input type="color" id="cat-edit-color" class="form-input"></div>
-        <div class="form-row"><label>Description</label><input id="cat-edit-desc" class="form-input"></div>
-        <div class="form-row"><label>Weekly hours</label><input type="number" id="cat-edit-weekly" class="form-input" min="0" step="0.5"></div>
-        <div class="form-row"><label>Priority</label><input type="number" id="cat-edit-priority" class="form-input" min="1" max="99"></div>
-        <label class="checkbox-container"><input type="checkbox" id="cat-edit-required"><span class="custom-checkbox"></span>Required</label>
-        <label class="checkbox-container"><input type="checkbox" id="cat-edit-export" checked><span class="custom-checkbox"></span>Include in reports</label>
-        <button class="btn btn-primary" onclick="saveCategoryEdit()">Save Category</button>
+      <div class="cat-add-section">
+        <div class="cat-add-header">+ NEW CATEGORY</div>
+        <div class="cat-add-fields">
+          <input type="color" id="cat-new-color" class="cat-color-swatch" value="#c5b3fa" title="Pick color">
+          <input id="cat-new-icon" class="cat-icon-input form-input" placeholder="✨" maxlength="4" value="✨">
+          <input id="cat-new-name" class="form-input cat-name-input" placeholder="Category name">
+          <input type="number" id="cat-new-weekly" class="form-input cat-hrs-input" placeholder="h/wk" min="0" step="0.5" value="0" title="Weekly hours target">
+          <button class="cat-add-btn" onclick="addNewCategory()">Add</button>
+        </div>
       </div>
-      <hr>
-      <h4>Add New Category</h4>
-      <div class="form-row"><input id="cat-new-name" class="form-input" placeholder="Category name"></div>
-      <div class="form-row"><input id="cat-new-icon" class="form-input" placeholder="Icon (emoji)" maxlength="4" value="✨"></div>
-      <div class="form-row"><input type="color" id="cat-new-color" value="#ffffff"></div>
-      <div class="form-row"><input id="cat-new-desc" class="form-input" placeholder="Description"></div>
-      <div class="form-row"><input type="number" id="cat-new-weekly" class="form-input" placeholder="Weekly hours" min="0" step="0.5" value="0"></div>
-      <div class="form-row"><input type="number" id="cat-new-priority" class="form-input" placeholder="Priority" value="50"></div>
-      <label class="checkbox-container"><input type="checkbox" id="cat-new-required"><span class="custom-checkbox"></span>Required</label>
-      <button class="btn btn-primary" onclick="addNewCategory()">+ Add Category</button>
     </div>
   </div>
 
