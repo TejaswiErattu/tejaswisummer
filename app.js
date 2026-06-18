@@ -1706,8 +1706,8 @@ function moveTaskToTomorrow(task, day) {
   led.count++; led.lastMovedFrom = day.date; led.movedOn = planToday();
   appState.rescheduleLedger[key] = led;
   saveState();
-  initUI();
   showDayDetails(tomorrow.date);
+  refreshUI();
 }
 
 function skipTask(task, day) {
@@ -1881,12 +1881,17 @@ function addNewExtracurricular() {
   modal.classList.add("open");
 }
 
+let _saveTimer = null;
 function saveState() {
-  localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
-  // Also sync to Firebase cloud if user is signed in
-  if (typeof saveStateToFirestore === "function" && currentUser) {
-    saveStateToFirestore();
-  }
+  // Debounce: collapse rapid sequential saves into one write
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+    if (typeof saveStateToFirestore === "function" && currentUser) {
+      saveStateToFirestore();
+    }
+  }, 80);
+}
 }
 
 function loadState() {
@@ -2073,6 +2078,19 @@ function spawnSparkles(e) {
 // 11. UI RENDERING & COMPONENT BUILDERS
 let activeMonth = "2026-06"; // Current calendar viewing month
 let selectedDate = null;     // Date open in side drawer
+
+let _calRenderTimer = null;
+function renderCalendarDaysDebounced() {
+  clearTimeout(_calRenderTimer);
+  _calRenderTimer = setTimeout(renderCalendarDays, 60);
+}
+
+// Lightweight refresh — only the parts that change on a typical task action
+function refreshUI() {
+  renderDashboardMetrics();
+  renderTodaySection();
+  renderCalendarDaysDebounced();
+}
 
 function initUI() {
   initializeExtracurriculars();
@@ -2401,8 +2419,8 @@ function renderCalendarDays() {
       task.id = `${day.date}_moved_${Date.now()}_${task.category}`;
       day.tasks.push(task);
       saveState();
-      initUI();
       showDayDetails(day.date);
+      refreshUI();
       playSynthSound("success");
       window._dragTask = null;
     });
@@ -2544,9 +2562,7 @@ function showDayDetails(dateStr) {
             else if (action === "skip") skipTask(task, day);
             else if (action === "blocked") blockTask(task, day);
             showDayDetails(dateStr);
-            renderTodaySection();
-            renderDashboardMetrics();
-            renderCalendarDays();
+            refreshUI();
           });
         });
       }
@@ -2557,9 +2573,8 @@ function showDayDetails(dateStr) {
           playSynthSound("click");
           day.tasks = day.tasks.filter(t => t.id !== task.id);
           saveState();
-          renderDashboardMetrics();
-          renderCalendarDays();
-          showDayDetails(dateStr); // re-render drawer
+          showDayDetails(dateStr);
+          refreshUI();
         });
       }
       
@@ -2579,11 +2594,8 @@ function showDayDetails(dateStr) {
           playSynthSound("click");
         }
         saveState();
-        
-        // Re-draw metrics, calendar dots
-        renderDashboardMetrics();
-        renderCalendarDays();
         renderTracksChecklists();
+        refreshUI();
         
         // Refresh drawer metrics
         const newTotal = day.tasks.reduce((sum, t) => sum + t.duration, 0);
@@ -2634,11 +2646,8 @@ function showDayDetails(dateStr) {
     playSynthSound("success");
     titleInput.value = "";
     durationInput.value = "1";
-
-    // Re-render everything
-    renderDashboardMetrics();
-    renderCalendarDays();
-    showDayDetails(dateStr); // re-render drawer with new task
+    showDayDetails(dateStr);
+    refreshUI();
   });
 
   // Show undo button if a rollover snapshot exists for this day
