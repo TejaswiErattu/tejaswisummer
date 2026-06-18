@@ -1442,7 +1442,7 @@ function showTaskNotesModal(taskId, taskTitle) {
     const noteObj = {};
     fields.forEach((id, i) => { const el = document.getElementById(id); noteObj[keys[i]] = el ? el.value : ""; });
     saveTaskNote(taskId, noteObj);
-    modal.style.display = "none";
+    modal.classList.remove("open");
     playSynthSound("success");
     if (selectedDate) showDayDetails(selectedDate);
     renderTodaySection();
@@ -1451,12 +1451,12 @@ function showTaskNotesModal(taskId, taskTitle) {
   deleteBtn.onclick = () => {
     if (confirm("Delete notes for this task?")) {
       deleteTaskNote(taskId);
-      modal.style.display = "none";
+      modal.classList.remove("open");
       playSynthSound("click");
     }
   };
 
-  modal.style.display = "flex";
+  modal.classList.add("open");
 }
 
 // ── Category management ──────────────────────────────────────────────────────
@@ -1741,12 +1741,12 @@ function editExtracurricular(idx) {
       notes: document.getElementById("ec-notes").value
     };
     saveState();
-    modal.style.display = "none";
+    modal.classList.remove("open");
     renderExtracurricularSummary();
     playSynthSound("success");
   };
-  
-  modal.style.display = "flex";
+
+  modal.classList.add("open");
 }
 
 function deleteExtracurricular(idx) {
@@ -1777,15 +1777,15 @@ function addNewExtracurricular() {
     if (newEc.name && newEc.role) {
       appState.extracurriculars.push(newEc);
       saveState();
-      modal.style.display = "none";
+      modal.classList.remove("open");
       renderExtracurricularSummary();
       playSynthSound("success");
     } else {
       alert("Please fill in Name and Role");
     }
   };
-  
-  modal.style.display = "flex";
+
+  modal.classList.add("open");
 }
 
 function saveState() {
