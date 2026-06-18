@@ -1129,6 +1129,14 @@ function forceRollover(dayDateStr) {
   const activeDayIndex = appState.days.findIndex(d => d.date === dayDateStr);
   if (activeDayIndex === -1) return;
 
+  // Save undo snapshot before modifying anything
+  appState.rolloverUndoSnapshot = {
+    days: JSON.parse(JSON.stringify(appState.days)),
+    lastRolloverDay: appState.settings.lastRolloverDay,
+    rescheduleLedger: JSON.parse(JSON.stringify(appState.rescheduleLedger || {})),
+    fromDate: dayDateStr
+  };
+
   // Mark the day itself as rolled over
   appState.days[activeDayIndex].rolledOver = true;
   appState.settings.lastRolloverDay = dayDateStr;
@@ -1206,13 +1214,25 @@ function forceRollover(dayDateStr) {
   // Combine past rolled-over tasks + future uncompleted curriculum tasks
   // Keep original sorting: PortSwigger -> AWS -> Sec+ -> Projects
   const combinedBacklog = [...pastUncompletedTasks, ...futureCurriculumBacklog];
-  
-  // Group and sort combinedBacklog by category order
+
   const categoryOrder = { "portswigger": 1, "aws": 2, "secplus": 3, "projects": 4, "ahf": 5, "leetcode": 6, "info310": 7, "palana": 8, "github": 9 };
   combinedBacklog.sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
 
-  // 3. Redistribute all backlog tasks starting from Day D+1
-  distributeCurriculumTasks(appState.days, combinedBacklog, activeDayIndex + 1);
+  // 3. Dump ALL rolled-over tasks onto the next day (not spread across the week)
+  if (activeDayIndex + 1 < appState.days.length) {
+    const nextDay = appState.days[activeDayIndex + 1];
+    combinedBacklog.forEach((t, i) => {
+      nextDay.tasks.push({
+        id: `${nextDay.date}_rollover_${i}_${t.category}`,
+        category: t.category,
+        title: t.title,
+        duration: t.duration,
+        completed: false,
+        link: t.link || null,
+        rolledFrom: dayDateStr
+      });
+    });
+  }
 
   // Save state & redraw UI
   saveState();
@@ -1227,6 +1247,19 @@ function forceRollover(dayDateStr) {
   
   // Sound effect
   playSynthSound("warning");
+}
+
+function undoRollover() {
+  const snap = appState.rolloverUndoSnapshot;
+  if (!snap) return alert("Nothing to undo.");
+  appState.days = snap.days;
+  appState.settings.lastRolloverDay = snap.lastRolloverDay;
+  appState.rescheduleLedger = snap.rescheduleLedger;
+  appState.rolloverUndoSnapshot = null;
+  saveState();
+  initUI();
+  showDayDetails(snap.fromDate);
+  playSynthSound("click");
 }
 
 // Reflows scheduled hours if Palana Project toggle or settings are modified.
@@ -2504,6 +2537,10 @@ function showDayDetails(dateStr) {
     showDayDetails(dateStr); // re-render drawer with new task
   });
 
+  // Show undo button if a rollover snapshot exists for this day
+  const undoBtn = document.getElementById("undo-rollover-btn");
+  if (undoBtn) undoBtn.style.display = appState.rolloverUndoSnapshot ? "block" : "none";
+
   // Open the drawer UI
   drawer.classList.add("open");
   backdrop.classList.add("active");
@@ -2672,7 +2709,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rollover-btn").addEventListener("click", () => {
     if (selectedDate) {
       forceRollover(selectedDate);
+      document.getElementById("undo-rollover-btn").style.display = "block";
     }
+  });
+  document.getElementById("undo-rollover-btn").addEventListener("click", () => {
+    undoRollover();
+    document.getElementById("undo-rollover-btn").style.display = appState.rolloverUndoSnapshot ? "block" : "none";
   });
 
   // 3. Tab navigation switcher
