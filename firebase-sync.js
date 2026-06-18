@@ -52,8 +52,9 @@ async function saveStateToFirestore() {
   if (!currentUser || isSyncing) return;
   isSyncing = true;
   try {
+    const { rolloverUndoSnapshot, ...persistable } = appState;
     await db.collection("users").doc(currentUser.uid).set({
-      state: JSON.stringify(appState),
+      state: JSON.stringify(persistable),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       displayName: currentUser.displayName,
       email: currentUser.email
@@ -75,24 +76,29 @@ async function loadStateFromFirestore() {
   if (!currentUser) return;
   try {
     const doc = await db.collection("users").doc(currentUser.uid).get();
+    const countTasks = (s) => (s?.days || []).reduce((n, d) => n + (d.tasks?.length || 0), 0);
+    const countDone  = (s) => (s?.days || []).reduce((n, d) => n + (d.tasks?.filter(t => t.completed).length || 0), 0);
+
     if (doc.exists && doc.data().state) {
       const cloudState = JSON.parse(doc.data().state);
-      // Validate loaded state
-      if (cloudState && cloudState.days && cloudState.days.length > 0) {
-        appState = cloudState;
-        // Also write to localStorage as local backup
-        localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+      const cloudTasks = countTasks(cloudState);
+      const localTasks = countTasks(appState);
+
+      if (cloudTasks === 0 && localTasks === 0) {
+        // Both empty — generate fresh and upload
+        generateNewState();
+        await saveStateToFirestore();
+      } else if (cloudTasks === 0 || countDone(cloudState) < countDone(appState)) {
+        // Cloud is empty or behind local — keep local, repair cloud
+        await saveStateToFirestore();
       } else {
-        // Cloud state is empty/corrupt — use local or generate fresh
-        if (!appState.days || appState.days.length === 0) {
-          generateNewState();
-        }
+        // Cloud has data — use it
+        appState = cloudState;
+        localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
       }
     } else {
-      // No cloud save yet — upload current local state to cloud
-      if (!appState.days || appState.days.length === 0) {
-        generateNewState();
-      }
+      // No cloud doc — upload local (or generate if also empty)
+      if (countTasks(appState) === 0) generateNewState();
       await saveStateToFirestore();
     }
   } catch (e) {
