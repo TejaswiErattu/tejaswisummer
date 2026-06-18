@@ -1706,7 +1706,8 @@ function moveTaskToTomorrow(task, day) {
   led.count++; led.lastMovedFrom = day.date; led.movedOn = planToday();
   appState.rescheduleLedger[key] = led;
   saveState();
-  initUI();
+  renderDashboardMetrics();
+  renderCalendarDays();
   showDayDetails(tomorrow.date);
 }
 
@@ -1881,12 +1882,17 @@ function addNewExtracurricular() {
   modal.classList.add("open");
 }
 
+let _saveTimer = null;
 function saveState() {
+  // Write to localStorage immediately so nothing is lost
   localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
-  // Also sync to Firebase cloud if user is signed in
-  if (typeof saveStateToFirestore === "function" && currentUser) {
-    saveStateToFirestore();
-  }
+  // Debounce Firestore writes — collapse rapid saves into one network call
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    if (typeof saveStateToFirestore === "function" && currentUser) {
+      saveStateToFirestore();
+    }
+  }, 800);
 }
 
 function loadState() {
@@ -2401,7 +2407,8 @@ function renderCalendarDays() {
       task.id = `${day.date}_moved_${Date.now()}_${task.category}`;
       day.tasks.push(task);
       saveState();
-      initUI();
+      renderDashboardMetrics();
+      renderCalendarDays();
       showDayDetails(day.date);
       playSynthSound("success");
       window._dragTask = null;
