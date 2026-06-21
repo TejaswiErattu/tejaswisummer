@@ -1162,16 +1162,17 @@ function forceRollover(dayDateStr) {
   appState.days[activeDayIndex].rolledOver = true;
   appState.settings.lastRolloverDay = dayDateStr;
 
-  // 1. Gather all uncompleted CURRICULUM tasks on or before the selected day
-  // Routine tasks (ahf, leetcode, info310, palana, github) are not rolled over —
-  // missed daily routines are just dropped rather than duplicated on future days.
+  // 1. Gather ALL uncompleted tasks on or before the selected day so they roll
+  // forward instead of being deleted. Curriculum tasks (portswigger/aws/secplus/
+  // projects) also get a "(Rolled Over)" tag and a reschedule-ledger entry for
+  // exports; routine tasks (ahf, leetcode, info310, palana, github, etc.) carry
+  // forward as-is. Nothing uncompleted is dropped.
   const pastUncompletedTasks = [];
   for (let i = 0; i <= activeDayIndex; i++) {
     const day = appState.days[i];
     const uncompleted = day.tasks.filter(t => !t.completed);
-    
+
     uncompleted.forEach(t => {
-      // Only roll over curriculum study tasks, not daily routines
       const isCurriculum = t.category === "portswigger" || t.category === "aws" ||
                            t.category === "secplus" || t.category === "projects";
       if (isCurriculum) {
@@ -1191,9 +1192,17 @@ function forceRollover(dayDateStr) {
           duration: t.duration,
           link: t.link
         });
+      } else {
+        // Routine task — carry it forward untouched rather than deleting it.
+        pastUncompletedTasks.push({
+          category: t.category,
+          title: t.title,
+          duration: t.duration,
+          link: t.link || null
+        });
       }
     });
-    
+
     // Clear uncompleted tasks from these past days so they aren't duplicated
     day.tasks = day.tasks.filter(t => t.completed);
   }
