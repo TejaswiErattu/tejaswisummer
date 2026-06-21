@@ -1258,6 +1258,67 @@ function undoRollover() {
   playSynthSound("click");
 }
 
+// One-time repair for schedules damaged by the old multi-day rollover (which
+// swept every day from the plan start through the rolled day). Rebuilds any
+// day that's missing its original tasks from a freshly generated pristine
+// schedule, removes the rolled-over piles, and preserves completion
+// checkmarks. Run from the console: repairRolloverDamage()
+function repairRolloverDamage() {
+  const cleanTitle = (s) => (s || "")
+    .replace(/ \(Part [AB]\)/g, "")
+    .replace(/ \(Rolled Over\)/g, "")
+    .trim();
+
+  // Build a pristine schedule without losing the real one.
+  const realDays = appState.days;
+  generateBaseSchedule();          // overwrites appState.days with pristine
+  const pristine = appState.days;
+  appState.days = realDays;        // restore the user's actual days
+  const pristineByDate = {};
+  pristine.forEach(d => { pristineByDate[d.date] = d; });
+
+  // 1. Remove every rolled-over dumped task (these are the displaced copies).
+  let removedRolled = 0;
+  appState.days.forEach(d => {
+    const before = d.tasks.length;
+    d.tasks = d.tasks.filter(t => !t.rolledFrom);
+    removedRolled += before - d.tasks.length;
+  });
+
+  // 2. For each day, re-add any pristine task that's now missing, preserving
+  //    completion if that task title was completed on that day.
+  let restoredTasks = 0, repairedDays = 0;
+  appState.days.forEach(d => {
+    const pris = pristineByDate[d.date];
+    if (!pris) return;
+    const completedTitles = new Set(
+      d.tasks.filter(t => t.completed).map(t => cleanTitle(t.title))
+    );
+    const currentTitles = new Set(d.tasks.map(t => cleanTitle(t.title)));
+    let added = 0;
+    pris.tasks.forEach(pt => {
+      if (!currentTitles.has(cleanTitle(pt.title))) {
+        const copy = JSON.parse(JSON.stringify(pt));
+        if (completedTitles.has(cleanTitle(pt.title))) copy.completed = true;
+        d.tasks.push(copy);
+        added++;
+      }
+    });
+    if (added) { repairedDays++; restoredTasks += added; }
+  });
+
+  appState.rolloverUndoSnapshot = null;
+  appState.settings.lastRolloverDay = null;
+  saveState();
+  applyCategoryColors();
+  initUI();
+  const summary = `Repair complete: restored ${restoredTasks} task(s) across ${repairedDays} day(s), removed ${removedRolled} rolled-over copy(ies).`;
+  console.log(summary);
+  alert(summary);
+  return { restoredTasks, repairedDays, removedRolled };
+}
+window.repairRolloverDamage = repairRolloverDamage;
+
 // Reflows scheduled hours if Palana Project toggle or settings are modified.
 // Does NOT lock any days, just reflows the future curriculum.
 function reflowRemainingCurriculum() {
