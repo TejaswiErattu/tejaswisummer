@@ -1188,24 +1188,24 @@ function forceRollover(dayDateStr) {
     appState.rescheduleLedger[cleanTitle] = led;
   };
 
-  for (let i = 0; i <= activeDayIndex; i++) {
-    const day = appState.days[i];
-    day.tasks.forEach(t => {
-      if (t.completed || ROLLOVER_LEAVE.has(t.category)) return;
-      recordLedger(t, day.date);
-      const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
-      const entry = {
-        category: t.category,
-        title: cleanTitle,
-        duration: t.duration || 0,
-        link: t.link || null,
-        originalDate: t.originalDate || day.date
-      };
-      (ROLLOVER_DISTRIBUTE.has(t.category) ? toDistribute : toToday).push(entry);
-    });
-    // Keep completed tasks and any untouched INFO 310 tasks
-    day.tasks = day.tasks.filter(t => t.completed || ROLLOVER_LEAVE.has(t.category));
-  }
+  // Only the day you actually rolled over is touched — no other day is
+  // gathered, cleared, or rescheduled.
+  const rolledDay = appState.days[activeDayIndex];
+  rolledDay.tasks.forEach(t => {
+    if (t.completed || ROLLOVER_LEAVE.has(t.category)) return;
+    recordLedger(t, rolledDay.date);
+    const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+    const entry = {
+      category: t.category,
+      title: cleanTitle,
+      duration: t.duration || 0,
+      link: t.link || null,
+      originalDate: t.originalDate || rolledDay.date
+    };
+    (ROLLOVER_DISTRIBUTE.has(t.category) ? toDistribute : toToday).push(entry);
+  });
+  // Keep completed tasks and any untouched INFO 310 tasks on the rolled day
+  rolledDay.tasks = rolledDay.tasks.filter(t => t.completed || ROLLOVER_LEAVE.has(t.category));
 
   let rollSeq = 0;
   const makeTask = (t, dateStr) => ({
