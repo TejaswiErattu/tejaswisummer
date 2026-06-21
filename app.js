@@ -1137,16 +1137,22 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
 }
 
 // 8. SMART ROLLOVER LOGIC ("I didn't finish today")
+// Categories that get spread across later days by available capacity
+// instead of piling onto today.
+const ROLLOVER_DISTRIBUTE = new Set(["aws", "secplus", "leetcode"]);
+// Categories left exactly where they are (not rolled at all).
+const ROLLOVER_LEAVE = new Set(["info310"]);
+// Curriculum categories that get a reschedule-ledger entry for exports.
+const ROLLOVER_CURRICULUM = new Set(["portswigger", "aws", "secplus", "projects"]);
+
 function forceRollover(dayDateStr) {
   const activeDayIndex = appState.days.findIndex(d => d.date === dayDateStr);
   if (activeDayIndex === -1) return;
 
-  // SAFETY: if there's no day after this one, there's nowhere to dump the
-  // backlog. Bail out BEFORE touching anything — otherwise the code below
-  // clears every uncompleted task and then silently drops them, wiping the
-  // whole plan.
-  if (activeDayIndex + 1 >= appState.days.length) {
-    alert("This is the last day in your plan — there's no next day to roll tasks into, so nothing was changed.");
+  const todayStr = getRealCurrentDate();
+  const todayDay = appState.days.find(d => d.date === todayStr);
+  if (!todayDay) {
+    alert("Today isn't in your plan range, so there's nowhere to roll tasks into. Nothing was changed.");
     return;
   }
 
@@ -1162,120 +1168,80 @@ function forceRollover(dayDateStr) {
   appState.days[activeDayIndex].rolledOver = true;
   appState.settings.lastRolloverDay = dayDateStr;
 
-  // 1. Gather ALL uncompleted tasks on or before the selected day so they roll
-  // forward instead of being deleted. Curriculum tasks (portswigger/aws/secplus/
-  // projects) also get a "(Rolled Over)" tag and a reschedule-ledger entry for
-  // exports; routine tasks (ahf, leetcode, info310, palana, github, etc.) carry
-  // forward as-is. Nothing uncompleted is dropped.
-  const pastUncompletedTasks = [];
+  // 1. Gather every uncompleted task on or before the selected day, except
+  //    INFO 310 (left in place). Split into two buckets:
+  //      - toDistribute: AWS / Security+ / LeetCode → spread by capacity
+  //      - toToday:      everything else            → pile onto today
+  //    Tasks are removed from their original day so nothing is duplicated;
+  //    completed tasks and untouched INFO 310 tasks stay put.
+  const toDistribute = [];
+  const toToday = [];
+
+  const recordLedger = (t, fromDate) => {
+    if (!ROLLOVER_CURRICULUM.has(t.category)) return;
+    const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+    appState.rescheduleLedger = appState.rescheduleLedger || {};
+    const led = appState.rescheduleLedger[cleanTitle] || { originalDate: (t.originalDate || fromDate), count: 0 };
+    led.count += 1;
+    led.lastMovedFrom = fromDate;
+    led.movedOn = new Date().toISOString();
+    appState.rescheduleLedger[cleanTitle] = led;
+  };
+
   for (let i = 0; i <= activeDayIndex; i++) {
     const day = appState.days[i];
-    const uncompleted = day.tasks.filter(t => !t.completed);
-
-    uncompleted.forEach(t => {
-      const isCurriculum = t.category === "portswigger" || t.category === "aws" ||
-                           t.category === "secplus" || t.category === "projects";
-      if (isCurriculum) {
-        // Record reschedule history in a lightweight ledger (keyed by clean title)
-        // so exports can report original date, move count, and last-moved-from.
-        const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
-        appState.rescheduleLedger = appState.rescheduleLedger || {};
-        const led = appState.rescheduleLedger[cleanTitle] || { originalDate: (t.originalDate || day.date), count: 0 };
-        led.count += 1;
-        led.lastMovedFrom = day.date;
-        led.movedOn = new Date().toISOString();
-        appState.rescheduleLedger[cleanTitle] = led;
-
-        pastUncompletedTasks.push({
-          category: t.category,
-          title: t.title.replace(" (Part A)", "").replace(" (Part B)", "") + " (Rolled Over)",
-          duration: t.duration,
-          link: t.link
-        });
-      } else {
-        // Routine task — carry it forward untouched rather than deleting it.
-        pastUncompletedTasks.push({
-          category: t.category,
-          title: t.title,
-          duration: t.duration,
-          link: t.link || null
-        });
-      }
-    });
-
-    // Clear uncompleted tasks from these past days so they aren't duplicated
-    day.tasks = day.tasks.filter(t => t.completed);
-  }
-
-  // 2. Gather all uncompleted curriculum tasks on days AFTER the selected day
-  const futureCurriculumBacklog = [];
-  
-  // We remove any extra overflow days that were created previously before recalculating
-  appState.days = appState.days.filter(d => !d.isOverflow);
-
-  for (let i = activeDayIndex + 1; i < appState.days.length; i++) {
-    const day = appState.days[i];
-    const curriculumTasks = day.tasks.filter(t => 
-      t.category === "portswigger" || 
-      t.category === "aws" || 
-      t.category === "secplus" || 
-      t.category === "projects"
-    );
-    
-    // Separate completed vs uncompleted
-    curriculumTasks.forEach(t => {
-      if (!t.completed) {
-        futureCurriculumBacklog.push({
-          category: t.category,
-          title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""), // remove partial tags
-          duration: t.duration,
-          link: t.link
-        });
-      }
-    });
-
-    // Remove uncompleted curriculum tasks from the day (keep completed ones)
-    day.tasks = day.tasks.filter(t => 
-      t.completed || 
-      !(t.category === "portswigger" || t.category === "aws" || t.category === "secplus" || t.category === "projects")
-    );
-  }
-
-  // Combine past rolled-over tasks + future uncompleted curriculum tasks
-  // Keep original sorting: PortSwigger -> AWS -> Sec+ -> Projects
-  const combinedBacklog = [...pastUncompletedTasks, ...futureCurriculumBacklog];
-
-  const categoryOrder = { "portswigger": 1, "aws": 2, "secplus": 3, "projects": 4, "ahf": 5, "leetcode": 6, "info310": 7, "palana": 8, "github": 9 };
-  combinedBacklog.sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
-
-  // 3. Dump ALL rolled-over tasks onto the next day (not spread across the week)
-  if (activeDayIndex + 1 < appState.days.length) {
-    const nextDay = appState.days[activeDayIndex + 1];
-    combinedBacklog.forEach((t, i) => {
-      nextDay.tasks.push({
-        id: `${nextDay.date}_rollover_${i}_${t.category}`,
+    day.tasks.forEach(t => {
+      if (t.completed || ROLLOVER_LEAVE.has(t.category)) return;
+      recordLedger(t, day.date);
+      const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+      const entry = {
         category: t.category,
-        title: t.title,
-        duration: t.duration,
-        completed: false,
+        title: cleanTitle,
+        duration: t.duration || 0,
         link: t.link || null,
-        rolledFrom: dayDateStr
-      });
+        originalDate: t.originalDate || day.date
+      };
+      (ROLLOVER_DISTRIBUTE.has(t.category) ? toDistribute : toToday).push(entry);
     });
+    // Keep completed tasks and any untouched INFO 310 tasks
+    day.tasks = day.tasks.filter(t => t.completed || ROLLOVER_LEAVE.has(t.category));
   }
+
+  let rollSeq = 0;
+  const makeTask = (t, dateStr) => ({
+    id: `${dateStr}_rollover_${Date.now()}_${rollSeq++}_${t.category}`,
+    category: t.category,
+    title: t.title + " (Rolled Over)",
+    duration: t.duration,
+    completed: false,
+    link: t.link || null,
+    rolledFrom: dayDateStr,
+    originalDate: t.originalDate
+  });
+
+  // 2. Pile "everything else" onto today.
+  toToday.forEach(t => todayDay.tasks.push(makeTask(t, todayStr)));
+
+  // 3. Distribute AWS / Security+ / LeetCode across later days that have spare
+  //    capacity (skip India-trip days). Security+ first so it lands soonest;
+  //    earliest-fit keeps earlier days full and the load even.
+  const distOrder = { secplus: 1, aws: 2, leetcode: 3 };
+  toDistribute.sort((a, b) => (distOrder[a.category] || 9) - (distOrder[b.category] || 9));
+
+  const candidateDays = appState.days.filter(d => d.date > todayStr && !d.isIndia);
+  const loadOf = (day) => day.tasks.reduce((s, t) => s + (t.duration || 0), 0);
+
+  toDistribute.forEach(t => {
+    const target = candidateDays.find(d => loadOf(d) + t.duration <= d.maxCapacity);
+    // Fall back to today if no later day has room — never drop the task.
+    (target || todayDay).tasks.push(makeTask(t, (target || todayDay).date));
+  });
 
   // Save state & redraw UI
   saveState();
+  applyCategoryColors();
   initUI();
-  
-  // Open the next day detail automatically to guide user flow
-  if (activeDayIndex + 1 < appState.days.length) {
-    showDayDetails(appState.days[activeDayIndex + 1].date);
-  } else {
-    closeDrawer();
-  }
-  
-  // Sound effect
+  showDayDetails(todayStr);
   playSynthSound("warning");
 }
 
