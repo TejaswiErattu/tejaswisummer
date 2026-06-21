@@ -1263,7 +1263,7 @@ function undoRollover() {
 // day that's missing its original tasks from a freshly generated pristine
 // schedule, removes the rolled-over piles, and preserves completion
 // checkmarks. Run from the console: repairRolloverDamage()
-function repairRolloverDamage() {
+function repairRolloverDamage(silent) {
   const cleanTitle = (s) => (s || "")
     .replace(/ \(Part [AB]\)/g, "")
     .replace(/ \(Rolled Over\)/g, "")
@@ -1314,10 +1314,28 @@ function repairRolloverDamage() {
   initUI();
   const summary = `Repair complete: restored ${restoredTasks} task(s) across ${repairedDays} day(s), removed ${removedRolled} rolled-over copy(ies).`;
   console.log(summary);
-  alert(summary);
+  if (!silent) alert(summary);
+  else if (typeof showAuthToast === "function" && (restoredTasks || removedRolled)) {
+    showAuthToast("✅ Schedule restored — " + restoredTasks + " tasks recovered.", "success");
+  }
   return { restoredTasks, repairedDays, removedRolled };
 }
 window.repairRolloverDamage = repairRolloverDamage;
+
+// One-time auto-repair: runs once on the next load to undo damage from the old
+// multi-day rollover, then sets a flag so it never runs again (future rollovers
+// are left alone). Safe no-op on an already-clean schedule.
+function maybeAutoRepairRollover() {
+  appState.settings = appState.settings || {};
+  if (appState.settings.rolloverRepairV1Done) return;
+  try {
+    repairRolloverDamage(true);
+  } catch (e) {
+    console.error("Auto-repair failed:", e);
+  }
+  appState.settings.rolloverRepairV1Done = true;
+  saveState();
+}
 
 // Reflows scheduled hours if Palana Project toggle or settings are modified.
 // Does NOT lock any days, just reflows the future curriculum.
@@ -2874,6 +2892,7 @@ function bootApp() {
   // Load local storage state
   loadState();
   migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
+  maybeAutoRepairRollover(); // one-time fix for old multi-day rollover damage
   applyCategoryColors();     // sync edited category colors into CSS variables
   initUI();
   

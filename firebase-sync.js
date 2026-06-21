@@ -42,6 +42,9 @@ auth.onAuthStateChanged(async (user) => {
     if (typeof migrateScheduleIfNeeded === "function") {
       migrateScheduleIfNeeded(); // upgrade older cloud schedules (adds Palana onboarding prep)
     }
+    if (typeof maybeAutoRepairRollover === "function") {
+      maybeAutoRepairRollover(); // one-time fix for old multi-day rollover damage (cloud state)
+    }
     if (typeof applyCategoryColors === "function") {
       applyCategoryColors(); // sync edited category colors from cloud state into CSS vars
     }
