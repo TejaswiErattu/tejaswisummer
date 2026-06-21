@@ -1141,6 +1141,15 @@ function forceRollover(dayDateStr) {
   const activeDayIndex = appState.days.findIndex(d => d.date === dayDateStr);
   if (activeDayIndex === -1) return;
 
+  // SAFETY: if there's no day after this one, there's nowhere to dump the
+  // backlog. Bail out BEFORE touching anything — otherwise the code below
+  // clears every uncompleted task and then silently drops them, wiping the
+  // whole plan.
+  if (activeDayIndex + 1 >= appState.days.length) {
+    alert("This is the last day in your plan — there's no next day to roll tasks into, so nothing was changed.");
+    return;
+  }
+
   // Save undo snapshot before modifying anything
   appState.rolloverUndoSnapshot = {
     days: JSON.parse(JSON.stringify(appState.days)),
@@ -1899,8 +1908,11 @@ function addNewExtracurricular() {
 
 let _saveTimer = null;
 function saveState() {
-  // Write to localStorage immediately so nothing is lost
-  localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
+  // Write to localStorage immediately so nothing is lost. Strip the transient
+  // undo snapshot first — it's a full copy of every day and would roughly
+  // double the saved size for no benefit (undo only needs to work in-session).
+  const { rolloverUndoSnapshot, ...persistable } = appState;
+  localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(persistable));
   // Debounce Firestore writes — collapse rapid saves into one network call
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
