@@ -378,7 +378,7 @@ let appState = {
     selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"], // default projects
     lastRolloverDay: null, // date string representing the last day forced rollover
     scheduleVersion: SCHEDULE_VERSION,
-    palanaSecurityEnabled: false, // ⭐ NEW: Palana Security role (disabled until June 27)
+    palanaSecurityEnabled: true, // Palana Security role secured — cycle always runs post-onboarding
     ahfWeeklyTarget: 7 // ⭐ NEW: AHF weekly hours (editable)
   },
   days: [], // array of all days
@@ -781,10 +781,10 @@ function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
     }));
   }
 
-  // After onboarding: only schedule if the Palana Security Role is activated.
-  // Mon–Fri, on the repeating 3-week threat-model → test → mitigate cycle.
+  // After onboarding the Palana Security role is active, so the work cycle
+  // always runs Mon–Fri on the repeating 3-week threat-model → test → mitigate
+  // rotation (no toggle required).
   if (dateStr >= PALANA_CYCLE_START) {
-    if (!appState.settings.palanaSecurityEnabled) return [];
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
       const weeksIn = Math.floor(getDaysBetween(PALANA_CYCLE_START, dateStr) / 7);
       const phaseIdx = ((weeksIn % 3) + 3) % 3;
