@@ -34,7 +34,7 @@ const BUILT_IN_CATEGORIES = {
     description: "Security certification prep"
   },
   aws: {
-    name: "AWS Cloud Practitioner",
+    name: "AWS AI Practitioner",
     icon: "☁️",
     color: "#ffb3a7",
     weeklyTarget: 6,
@@ -59,15 +59,6 @@ const BUILT_IN_CATEGORIES = {
     priority: 5,
     required: true,
     description: "Hopeful Fridays tech leadership"
-  },
-  info310: {
-    name: "INFO 310 Security",
-    icon: "🏫",
-    color: "#8ae9c1",
-    weeklyTarget: 5,
-    priority: 6,
-    required: true,
-    description: "University security course"
   },
   palana: {
     name: "Palana Preparation",
@@ -214,16 +205,6 @@ const BUILT_IN_EXTRACURRICULARS = [
     notes: "Pre-onboarding security engineering preparation"
   },
   {
-    id: "info310",
-    name: "INFO 310 (Security)",
-    role: "Student",
-    categoryId: "info310",
-    status: "active-through-aug-21",
-    weeklyHours: 5,
-    nextEvent: "June 22 - Aug 21",
-    notes: "University security course"
-  },
-  {
     id: "leetcode",
     name: "LeetCode 75",
     role: "Practitioner",
@@ -245,7 +226,7 @@ const BUILT_IN_EXTRACURRICULARS = [
   },
   {
     id: "aws",
-    name: "AWS Cloud Practitioner",
+    name: "AWS AI Practitioner",
     role: "Exam Candidate",
     categoryId: "aws",
     status: "active-until-passed",
@@ -330,7 +311,7 @@ const CORE_CURRICULUM = {
     { id: "aws_rev_6", title: "AWS Review: Monitoring, Scaling & Elasticity", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
     { id: "aws_rev_7", title: "AWS Review: Pricing, Support Plans & TCO", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
     { id: "aws_exam_prep", title: "AWS Skill Builder Mock Exam & Review", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
-    { id: "aws_exam", title: "AWS Cloud Practitioner Certification Exam", duration: 1.5, link: "https://aws.amazon.com/certification/certified-cloud-practitioner/" }
+    { id: "aws_exam", title: "AWS AI Practitioner Certification Exam", duration: 1.5, link: "https://aws.amazon.com/certification/certified-ai-practitioner/" }
   ],
   
   // PortSwigger Tasks (Track 1)
@@ -426,34 +407,28 @@ const PALANA_PREP_TASKS_DETAILED = {
     { title: "Begin cybersecurity threat-modeling course (first section of 3.5h total)", duration: 1.0 }
   ],
   "2026-06-16": [ // Tuesday
-    { title: "Continue threat-modeling course (CIA, assets, threats, vulnerabilities, risk, controls)", duration: 1.0 },
-    { title: "Create Palana asset inventory (document impact if exposed/changed/unavailable for each asset)", duration: 1.5 }
+    { title: "Continue threat-modeling course (CIA, assets, threats, vulnerabilities, risk, controls)", duration: 1.0 }
   ],
   "2026-06-17": [ // Wednesday
     { title: "Finish remaining threat-modeling course portions", duration: 1.5 },
-    { title: "Review four core threat-modeling questions", duration: 0.5 },
-    { title: "Create Threat Register v0.1 with at least 5 initial threats", duration: 1.0 }
+    { title: "Review four core threat-modeling questions", duration: 0.5 }
   ],
   "2026-06-18": [ // Thursday
-    { title: "Watch cybersecurity videos from Matt (add video links in notes)", duration: 1.0 },
-    { title: "Create Draft Palana Data-Flow Diagram v0.1 with trust boundaries", duration: 1.0 }
+    { title: "Watch cybersecurity videos from Matt (add video links in notes)", duration: 1.0 }
   ],
   "2026-06-19": [ // Friday
     { title: "Study STRIDE and apply to Palana ride-request flow (2+ threats per category)", duration: 1.0 },
     { title: "Complete PortSwigger threat/vulnerability analysis (attach lab link)", duration: 1.0 }
   ],
   "2026-06-20": [ // Saturday
-    { title: "Review Firebase security (auth vs authorization, rules, emulator suite)", duration: 1.5 },
-    { title: "Create Firebase review checklist", duration: 0.75 }
+    { title: "Review Firebase security (auth vs authorization, rules, emulator suite)", duration: 1.5 }
   ],
   "2026-06-21": [ // Sunday
-    { title: "Review week's notes, clean up DFD and threat register", duration: 0.75 },
     { title: "Complete beginner Firebase/access-control exercise", duration: 0.5 },
     { title: "Write questions for Matt and create Week 1 summary", duration: 0.75 }
   ],
   "2026-06-22": [ // Monday
-    { title: "Study broken access control and IDOR", duration: 1.0 },
-    { title: "Create authorization test plan with at least 10 tests", duration: 1.0 }
+    { title: "Study broken access control and IDOR", duration: 1.0 }
   ],
   "2026-06-23": [ // Tuesday
     { title: "Practice Burp Suite (proxy, repeater, modify IDs/headers/tokens)", duration: 1.5 },
@@ -464,13 +439,8 @@ const PALANA_PREP_TASKS_DETAILED = {
     { title: "Download diagrams and save onboarding questions", duration: 0.15 },
     { title: "Review CIA and STRIDE if convenient", duration: 0.15 }
   ],
-  "2026-06-25": [ // Thursday
-    { title: "Create professional finding template (title, severity, steps, impact, remediation)", duration: 0.75 },
-    { title: "Sample finding: Rider can access another rider's active trip by changing ride ID", duration: 0.25 }
-  ],
   "2026-06-26": [ // Friday
     { title: "Organize onboarding questions into categories and choose top 12", duration: 0.5 },
-    { title: "Create vulnerability-searching checklist", duration: 0.25 },
     { title: "Prepare short introduction for onboarding", duration: 0.25 }
   ],
   "2026-06-27": [ // Saturday — onboarding day
@@ -740,12 +710,59 @@ function buildMentorTasksForDay(dateStr) {
   return tasks;
 }
 
+// ⭐ WINFO — Finance Director duties (recurring weekly on Tuesdays)
+function buildWinfoTasksForDay(dateStr) {
+  const tasks = [];
+  if (isIndiaTrip(dateStr)) return tasks; // paused during India trip
+  const dayOfWeek = getDayOfWeek(dateStr);
+  if (dayOfWeek === 2) { // Tuesday
+    tasks.push({
+      id: `${dateStr}_winfo_meeting`,
+      category: "winfo",
+      title: "WINFO Meeting",
+      duration: 1.0,
+      completed: false,
+      recurring: "weekly-tuesday",
+      fixed: true,
+      link: null
+    });
+    tasks.push({
+      id: `${dateStr}_winfo_reimb`,
+      category: "winfo",
+      title: "WINFO: Check reimbursements",
+      duration: 0.5,
+      completed: false,
+      link: null
+    });
+    tasks.push({
+      id: `${dateStr}_winfo_grants`,
+      category: "winfo",
+      title: "WINFO: Check open grants & scholarships",
+      duration: 0.5,
+      completed: false,
+      link: null
+    });
+  }
+  return tasks;
+}
+
 function isPalanaPrepWindow(dateStr) {
   return dateStr >= START_DATE_STR && dateStr < PALANA_ONBOARDING_STR;
 }
 
 // Builds the Palana task for a given day (or null if none should be scheduled).
 // Before onboarding: intensive daily "Palana Onboarding Prep" blocks.
+// Post-onboarding Palana Security work runs on a repeating 3-week cycle,
+// Monday–Friday, anchored to the first Monday after onboarding (June 29):
+//   week 1 → threat modeling, week 2 → test vulnerabilities,
+//   week 3 → document & help dev team mitigate, then repeat to end of summer.
+const PALANA_CYCLE_START = "2026-06-29";
+const PALANA_CYCLE_PHASES = [
+  "Threat modeling",
+  "Test the vulnerabilities",
+  "Document findings & help dev team mitigate"
+];
+
 // After onboarding: regular weekday safety-engineering work blocks.
 function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
   if (!appState.settings.palanaEnabled) return [];
@@ -764,17 +781,22 @@ function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
     }));
   }
 
-  // After onboarding: only schedule if Palana Security Role is activated
-  if (dateStr > "2026-06-28") {
+  // After onboarding: only schedule if the Palana Security Role is activated.
+  // Mon–Fri, on the repeating 3-week threat-model → test → mitigate cycle.
+  if (dateStr >= PALANA_CYCLE_START) {
     if (!appState.settings.palanaSecurityEnabled) return [];
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+      const weeksIn = Math.floor(getDaysBetween(PALANA_CYCLE_START, dateStr) / 7);
+      const phaseIdx = ((weeksIn % 3) + 3) % 3;
+      const phase = PALANA_CYCLE_PHASES[phaseIdx];
       const palanaHours = dayOfWeek === 5 ? 2.0 : 1.5;
       return [{
         id: `${dateStr}_palana_sec`,
         category: "palana_security",
-        title: "Palana Security Engineering Work",
+        title: `Palana Security — ${phase}`,
         duration: palanaHours,
         completed: false,
+        cyclePhase: phaseIdx + 1,
         link: null
       }];
     }
@@ -815,7 +837,6 @@ function generateBaseSchedule() {
     const dateStr = formatDate(current);
     const dayOfWeek = getDayOfWeek(dateStr);
     const isIndia = isIndiaTrip(dateStr);
-    const isClassActive = isInfo310Class(dateStr);
     const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     
     const dayObj = {
@@ -847,17 +868,7 @@ function generateBaseSchedule() {
       leetcodeId: null // will populate below
     });
 
-    // 3. College class INFO 310 (June 22 - Aug 21, Weekdays only, 1h)
-    if (isClassActive && isWeekday) {
-      dayObj.tasks.push({
-        id: `${dateStr}_info310`,
-        category: "info310",
-        title: "INFO 310 – Security Studies (Lecture/Review)",
-        duration: 1.0,
-        completed: false,
-        link: null
-      });
-    }
+    // (INFO 310 course removed — tracked separately in Canvas.)
 
     // 4. Palana — intensive onboarding prep before the job starts (week of June 27),
     //    then regular safety-engineering work blocks afterwards.
@@ -877,6 +888,21 @@ function generateBaseSchedule() {
     mentorTasks.forEach(task => {
       dayObj.tasks.push(task);
     });
+
+    // 7. ⭐ WINFO — Finance Director duties (Tuesdays)
+    buildWinfoTasksForDay(dateStr).forEach(task => dayObj.tasks.push(task));
+
+    // 8. ⭐ One-off: update resume / CV
+    if (dateStr === "2026-06-23") {
+      dayObj.tasks.push({
+        id: `${dateStr}_resume_update`,
+        category: "personal",
+        title: "Update resume / CV",
+        duration: 1.0,
+        completed: false,
+        link: null
+      });
+    }
 
     daysList.push(dayObj);
     current.setDate(current.getDate() + 1);
@@ -955,16 +981,12 @@ function generateBaseSchedule() {
 // Distributes a backlog of curriculum tasks onto future days (from `startDayIndex` onwards)
 // respecting max capacities, India trip constraints, and sequencing rules.
 function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
-  // Clear any existing curriculum tasks from the days we are reflowing
+  // Clear any existing curriculum tasks from the days we are reflowing.
+  // Keep completed tasks and all fixed/routine categories — only the curriculum
+  // tracks (portswigger/aws/secplus/projects) get redistributed.
+  const KEEP_CATS = new Set(["ahf", "leetcode", "palana", "palana_security", "github", "mentor", "winfo", "personal"]);
   for (let i = startDayIndex; i < daysArray.length; i++) {
-    daysArray[i].tasks = daysArray[i].tasks.filter(t => 
-      t.completed || 
-      t.category === "ahf" || 
-      t.category === "leetcode" || 
-      t.category === "info310" || 
-      t.category === "palana" || 
-      t.category === "github"
-    );
+    daysArray[i].tasks = daysArray[i].tasks.filter(t => t.completed || KEEP_CATS.has(t.category));
   }
 
   let backlogIndex = 0;
@@ -1141,7 +1163,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
 // instead of piling onto today.
 const ROLLOVER_DISTRIBUTE = new Set(["aws", "secplus", "leetcode"]);
 // Categories left exactly where they are (not rolled at all).
-const ROLLOVER_LEAVE = new Set(["info310"]);
+const ROLLOVER_LEAVE = new Set([]);
 // Curriculum categories that get a reschedule-ledger entry for exports.
 const ROLLOVER_CURRICULUM = new Set(["portswigger", "aws", "secplus", "projects"]);
 
@@ -1398,7 +1420,6 @@ function reflowRemainingCurriculum() {
     // Re-add routines if they were not already completed
     const dayOfWeek = getDayOfWeek(day.date);
     const isIndia = day.isIndia;
-    const isClassActive = isInfo310Class(day.date);
     const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     
     // AHF — use detailed tasks when available
@@ -1423,17 +1444,7 @@ function reflowRemainingCurriculum() {
       lcIndex++;
     }
 
-    // INFO 310
-    if (isClassActive && isWeekday && !day.tasks.some(t => t.category === "info310")) {
-      day.tasks.push({
-        id: `${day.date}_info310`,
-        category: "info310",
-        title: "INFO 310 – Security Studies (Lecture/Review)",
-        duration: 1.0,
-        completed: false,
-        link: null
-      });
-    }
+    // (INFO 310 course removed — tracked separately in Canvas.)
 
     // Palana prep / security (array return)
     if (!day.tasks.some(t => t.category === "palana" || t.category === "palana_security")) {
@@ -1450,6 +1461,11 @@ function reflowRemainingCurriculum() {
     // Mentor meetings (fixed recurring)
     if (!day.tasks.some(t => t.category === "mentor")) {
       buildMentorTasksForDay(day.date).forEach(t => day.tasks.push(t));
+    }
+
+    // WINFO — Finance Director duties (Tuesdays)
+    if (!day.tasks.some(t => t.category === "winfo")) {
+      buildWinfoTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
   }
 

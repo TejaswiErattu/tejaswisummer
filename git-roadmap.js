@@ -2,10 +2,10 @@
 // Loaded before app.js; exposes GIT_PROJECT_ROADMAP and buildGitProjectTasksForDay()
 
 const GIT_PROJECT_START = "2026-06-15";
+// Cadence: Monday start-of-week planning, lead-up work on Mon/Tue, and a
+// hard deliverable DEADLINE every Wednesday.
 const GIT_PROJECT_MEETINGS = {
-  planning: { dayOfWeek: 1, title: "Git Project: Start-of-week planning", duration: 0.75, owner: "shared" },
-  sync: { dayOfWeek: 3, title: "Git Project: Midweek sync", duration: 0.5, owner: "shared" },
-  demo: { dayOfWeek: 6, title: "Git Project: End-of-week demo review", duration: 1.0, owner: "shared" }
+  planning: { dayOfWeek: 1, title: "Git Project: Start-of-week planning", duration: 0.75, owner: "shared" }
 };
 
 const GIT_PROJECT_ROADMAP = [
@@ -116,54 +116,63 @@ function buildGitProjectTasksForDay(dateStr, dayOfWeek, isIndia) {
   const ownerLabel = { tejaswi: "Tejaswi", thanishka: "Thanishka", shared: "Shared" };
   const heavyPrep = dateStr >= "2026-06-15" && dateStr <= "2026-06-23";
 
-  // Recurring meetings (fixed) — skip midweek sync during heavy Palana prep
-  Object.values(GIT_PROJECT_MEETINGS).forEach(m => {
-    if (dayOfWeek === m.dayOfWeek) {
-      if (heavyPrep && m.dayOfWeek === 3) return;
-      tasks.push({
-        id: `${dateStr}_git_${m.dayOfWeek}`,
-        category: "github",
-        title: m.title,
-        duration: m.duration,
-        completed: false,
-        fixed: true,
-        owner: m.owner,
-        link: null,
-        projectWeek: week.week
-      });
-    }
-  });
-
-  // Skip roadmap tasks during intensive Palana prep (meetings only)
-  if (heavyPrep) return tasks;
-
-  // Distribute weekly tasks across weekdays (Sat primary dev day, travel = light only)
-  const dayIndex = Math.floor((parseGitDate(dateStr) - parseGitDate(week.start)) / 86400000);
-  const pool = week.tasks.filter(t => isIndia ? t.travelFriendly : true);
-  if (pool.length === 0) return tasks;
-
-  // Schedule 1-2 roadmap tasks per appropriate day
-  const schedDays = isIndia ? [0, 3, 6] : [1, 3, 6]; // light days during travel
-  const schedIdx = schedDays.indexOf(dayOfWeek);
-  if (schedIdx === -1) return tasks;
-
-  const tasksPerSlot = isIndia ? 1 : (dayOfWeek === 6 ? 2 : 1);
-  const baseIdx = (week.week * 7 + dayIndex) % pool.length;
-  for (let i = 0; i < tasksPerSlot; i++) {
-    const src = pool[(baseIdx + i) % pool.length];
+  // Monday: start-of-week planning meeting (fixed)
+  if (dayOfWeek === GIT_PROJECT_MEETINGS.planning.dayOfWeek) {
     tasks.push({
-      id: `${dateStr}_git_task_${i}`,
+      id: `${dateStr}_git_planning`,
       category: "github",
-      title: `[W${week.week}] ${src.title} (${ownerLabel[src.owner]})`,
-      duration: isIndia ? Math.min(src.duration, 0.5) : src.duration,
+      title: GIT_PROJECT_MEETINGS.planning.title,
+      duration: GIT_PROJECT_MEETINGS.planning.duration,
       completed: false,
-      owner: src.owner,
-      travelFriendly: src.travelFriendly,
+      fixed: true,
+      owner: GIT_PROJECT_MEETINGS.planning.owner,
       link: null,
-      projectWeek: week.week,
-      deliverable: week.deliverables
+      projectWeek: week.week
     });
   }
+
+  // During intensive Palana prep, only the planning meeting (no roadmap work).
+  if (heavyPrep) return tasks;
+
+  // Lead-up work tasks: spread the week's roadmap items across Mon & Tue,
+  // each as its own dated item leading up to the Wednesday deadline.
+  const pool = week.tasks.filter(t => (isIndia ? t.travelFriendly : true));
+  if ((dayOfWeek === 1 || dayOfWeek === 2) && pool.length) {
+    const half = Math.ceil(pool.length / 2);
+    const slice = dayOfWeek === 1 ? pool.slice(0, half) : pool.slice(half);
+    slice.forEach((src, i) => {
+      tasks.push({
+        id: `${dateStr}_git_task_${i}`,
+        category: "github",
+        title: `[W${week.week}] ${src.title} (${ownerLabel[src.owner]})`,
+        duration: isIndia ? Math.min(src.duration, 0.5) : src.duration,
+        completed: false,
+        owner: src.owner,
+        travelFriendly: src.travelFriendly,
+        link: null,
+        projectWeek: week.week,
+        deliverable: week.deliverables
+      });
+    });
+  }
+
+  // Wednesday: weekly deliverable DEADLINE.
+  if (dayOfWeek === 3) {
+    tasks.push({
+      id: `${dateStr}_git_deadline`,
+      category: "github",
+      title: `[W${week.week}] DEADLINE — ${week.label}: ${week.deliverables}`,
+      duration: 1.0,
+      completed: false,
+      fixed: true,
+      owner: "shared",
+      link: null,
+      projectWeek: week.week,
+      deliverable: week.deliverables,
+      deadline: true
+    });
+  }
+
   return tasks;
 }
 
