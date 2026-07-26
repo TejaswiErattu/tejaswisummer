@@ -45,7 +45,7 @@ const GIT_PROJECT_ROADMAP = [
     deliverables: "Running extension, repo connection, README setup"
   },
   {
-    week: 4, label: "Branch & activity visualization", start: "2026-07-06", end: "2026-07-12",
+    week: 4, label: "Branch & activity visualization", start: "2026-07-27", end: "2026-08-02",
     tasks: [
       { title: "Build branch list/cards & commit summaries", duration: 1.5, owner: "tejaswi", travelFriendly: false },
       { title: "Add activity sections & file-change indicators", duration: 1.0, owner: "tejaswi", travelFriendly: false },
@@ -56,7 +56,7 @@ const GIT_PROJECT_ROADMAP = [
     deliverables: "Branch/activity screen, demo screenshots"
   },
   {
-    week: 5, label: "Natural-language Git assistant", start: "2026-07-13", end: "2026-07-19",
+    week: 5, label: "Natural-language Git assistant", start: "2026-08-03", end: "2026-08-09",
     tasks: [
       { title: "Design assistant interaction & confirmation flow", duration: 1.5, owner: "tejaswi", travelFriendly: false },
       { title: "Build input/response UI with beginner-friendly messages", duration: 1.0, owner: "tejaswi", travelFriendly: false },
@@ -67,7 +67,7 @@ const GIT_PROJECT_ROADMAP = [
     deliverables: "NL input, command interpretation, confirmation flow"
   },
   {
-    week: 6, label: "Secret detection & testing", start: "2026-07-20", end: "2026-07-26",
+    week: 6, label: "Secret detection & testing", start: "2026-08-10", end: "2026-08-16",
     tasks: [
       { title: "Design secret-warning experience", duration: 1.0, owner: "tejaswi", travelFriendly: false },
       { title: "Connect warning flow to Git assistant", duration: 1.0, owner: "tejaswi", travelFriendly: false },
@@ -78,7 +78,7 @@ const GIT_PROJECT_ROADMAP = [
     deliverables: "Secret detection, warning UI, automated tests"
   },
   {
-    week: 7, label: "Debugging & refinement", start: "2026-07-27", end: "2026-08-02",
+    week: 7, label: "Debugging & refinement", start: "2026-08-17", end: "2026-08-23",
     tasks: [
       { title: "Merge-conflict guidance or activity-over-time view", duration: 1.5, owner: "tejaswi", travelFriendly: false },
       { title: "Improve onboarding & empty states", duration: 1.0, owner: "tejaswi", travelFriendly: false },
@@ -88,7 +88,7 @@ const GIT_PROJECT_ROADMAP = [
     deliverables: "Fixed bugs, demo repo, polished UI"
   },
   {
-    week: 8, label: "Final MVP & presentation", start: "2026-08-03", end: "2026-08-09",
+    week: 8, label: "Final MVP & presentation", start: "2026-08-24", end: "2026-08-30",
     tasks: [
       { title: "Draft executive summary & product story", duration: 1.5, owner: "tejaswi", travelFriendly: true },
       { title: "Prepare presentation narrative", duration: 1.0, owner: "tejaswi", travelFriendly: true },

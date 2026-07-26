@@ -221,7 +221,7 @@ const BUILT_IN_EXTRACURRICULARS = [
     categoryId: "secplus",
     status: "active",
     weeklyHours: 10,
-    nextEvent: "Target: Aug 18-22",
+    nextEvent: "Target: Aug 25",
     notes: "Certification exam prep"
   },
   {
@@ -366,7 +366,7 @@ const CORE_CURRICULUM = {
 
 // Bump this whenever the schedule-generation logic changes. On load, saved states
 // (local + cloud) with an older version auto-migrate while preserving completed tasks.
-const SCHEDULE_VERSION = 3;
+const SCHEDULE_VERSION = 5;
 const PLAN_TIMEZONE = "America/Los_Angeles";
 
 let appState = {
@@ -394,6 +394,9 @@ const INDIA_START_STR = "2026-06-24";
 const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
 const INFO_END_STR = "2026-08-21";
+const SECPLUS_START_DATE = "2026-08-01";
+const SECPLUS_EXAM_DATE = "2026-08-25";
+const LEETCODE_START_2PERDAY = "2026-07-26";
 
 // Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
 // front-loaded into the lead-up window (plan start → day before onboarding).
@@ -854,19 +857,27 @@ function generateBaseSchedule() {
       dayObj.tasks.push(task);
     });
     
-    // 2. LeetCode (1 problem/day, daily, ~0.5h)
-    // Draw problem id from 1 to 75. Let's do it sequentially.
-    // For indexing: let's map it based on the number of days we've generated
-    // (We will adjust LC problem IDs dynamically so that Sunday can be skipped/grouped)
-    dayObj.tasks.push({
-      id: `${dateStr}_leetcode`,
-      category: "leetcode",
-      title: "LeetCode Blind 75 Problem",
-      duration: 0.5,
-      completed: false,
-      link: "https://neetcode.io/practice/practice/blind75",
-      leetcodeId: null // will populate below
-    });
+    // 2. LeetCode (2 problems/day from LEETCODE_START_2PERDAY onward)
+    if (dateStr >= LEETCODE_START_2PERDAY) {
+      dayObj.tasks.push({
+        id: `${dateStr}_leetcode_1`,
+        category: "leetcode",
+        title: "LeetCode Blind 75 Problem",
+        duration: 0.5,
+        completed: false,
+        link: "https://neetcode.io/practice/practice/blind75",
+        leetcodeId: null
+      });
+      dayObj.tasks.push({
+        id: `${dateStr}_leetcode_2`,
+        category: "leetcode",
+        title: "LeetCode Blind 75 Problem",
+        duration: 0.5,
+        completed: false,
+        link: "https://neetcode.io/practice/practice/blind75",
+        leetcodeId: null
+      });
+    }
 
     // (INFO 310 course removed — tracked separately in Canvas.)
 
@@ -908,19 +919,23 @@ function generateBaseSchedule() {
     current.setDate(current.getDate() + 1);
   }
 
-  // ⭐ UPDATED: Assign exact LeetCode questions from BLIND_75_QUESTIONS array (1 per day, including Sundays)
+  // Assign LeetCode questions: 2/day from LEETCODE_START_2PERDAY, remove excess placeholders
   let lcIndex = 0;
   for (let i = 0; i < daysList.length; i++) {
     const day = daysList[i];
-    const lcTask = day.tasks.find(t => t.category === "leetcode");
-    
-    if (lcTask) {
-      // Schedule exactly 1 LeetCode problem per day (including Sunday)
-      lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex % 75].id} - ${BLIND_75_QUESTIONS[lcIndex % 75].name}`;
-      lcTask.link = BLIND_75_QUESTIONS[lcIndex % 75].link;
-      lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex % 75].id;
-      lcIndex++;
+    const lcTasks = day.tasks.filter(t => t.category === "leetcode");
+    for (const lcTask of lcTasks) {
+      if (lcIndex < 75) {
+        lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex].id} - ${BLIND_75_QUESTIONS[lcIndex].name}`;
+        lcTask.link = BLIND_75_QUESTIONS[lcIndex].link;
+        lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex].id;
+        lcIndex++;
+      }
     }
+  }
+  // Remove unassigned leetcode placeholders
+  for (const day of daysList) {
+    day.tasks = day.tasks.filter(t => t.category !== "leetcode" || t.leetcodeId !== null);
   }
 
   // Create Curriculum Backlog (Tracks 1, 2, 3, 4)
@@ -946,33 +961,46 @@ function generateBaseSchedule() {
     });
   });
 
-  // Add Security+ Tasks (Track 3)
+  // Add Security+ Tasks (Track 3) and Projects (Track 4) — interleaved so
+  // they distribute concurrently across August instead of sequentially.
+  const secplusBacklog = [];
   CORE_CURRICULUM.secplus.forEach(t => {
-    curriculumBacklog.push({
-      category: "secplus",
-      title: t.title,
-      duration: t.duration,
-      link: t.link
-    });
+    if (t.id === "sec_exam") return;
+    secplusBacklog.push({ category: "secplus", title: t.title, duration: t.duration, link: t.link });
   });
 
-  // Add Selected Projects Tasks (Track 4)
+  const projectsBacklog = [];
   appState.settings.selectedProjects.forEach(projId => {
     const proj = TRACK_4_PROJECTS.find(p => p.id === projId);
     if (proj) {
       proj.tasks.forEach(t => {
-        curriculumBacklog.push({
-          category: "projects",
-          title: t.name,
-          duration: t.duration,
-          link: "https://bestprojectideas.com/cybersecurity-project-ideas/"
-        });
+        projectsBacklog.push({ category: "projects", title: t.name, duration: t.duration, link: "https://bestprojectideas.com/cybersecurity-project-ideas/" });
       });
     }
   });
 
+  const maxBacklogLen = Math.max(secplusBacklog.length, projectsBacklog.length);
+  for (let i = 0; i < maxBacklogLen; i++) {
+    if (i < secplusBacklog.length) curriculumBacklog.push(secplusBacklog[i]);
+    if (i < projectsBacklog.length) curriculumBacklog.push(projectsBacklog[i]);
+  }
+
   // Schedule Curriculum Tasks sequentially into the calendar days
   distributeCurriculumTasks(daysList, curriculumBacklog, 0);
+
+  // Place Security+ exam on Aug 25 as a fixed task
+  const examDay = daysList.find(d => d.date === SECPLUS_EXAM_DATE);
+  if (examDay) {
+    examDay.tasks.push({
+      id: `${SECPLUS_EXAM_DATE}_sec_exam`,
+      category: "secplus",
+      title: "CompTIA Security+ SY0-701 Certification Exam",
+      duration: 2.5,
+      completed: false,
+      fixed: true,
+      link: "https://www.comptia.org/certifications/security"
+    });
+  }
 
   appState.days = daysList;
 }
@@ -998,8 +1026,8 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
     
     // Rule: PortSwigger (Track 1) runs June 13 - June 27, but drops to 0 hrs during India trip (starts June 24).
     // AWS runs first week (exam June 23).
-    // Security+ starts July 9.
-    // Projects run after Security+ exam.
+    // Security+ starts August 1, exam August 25.
+    // Projects run after Security+ exam (Aug 26+).
     // So we apply constraints based on date ranges:
     const isIndia = day.isIndia;
     
@@ -1012,9 +1040,13 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
     
     // Calculate current scheduled hours from routines
     let scheduledHours = day.tasks.reduce((sum, t) => sum + t.duration, 0);
-    
+
+    // Allow slight capacity stretch in August to fit all curriculum before Sep 1
+    const effectiveCap = (day.date >= SECPLUS_START_DATE && day.date <= END_DATE_STR)
+      ? day.maxCapacity + 1.0 : day.maxCapacity;
+
     // Distribute tasks on this day up to its maxCapacity
-    while (scheduledHours < day.maxCapacity && backlogIndex < backlog.length) {
+    while (scheduledHours < effectiveCap && backlogIndex < backlog.length) {
       const task = backlog[backlogIndex];
       
       // Check date availability constraints for the specific track:
@@ -1031,21 +1063,19 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
       }
       
       if (task.category === "secplus") {
-        // Security+ starts after India trip (July 9)
-        if (day.date < "2026-07-09") {
-          break; // Cannot schedule Sec+ before July 9. Move to next day.
+        if (day.date < SECPLUS_START_DATE) {
+          break;
         }
       }
 
       if (task.category === "projects") {
-        // Projects start after Security+ exam (target August 22/23)
-        if (day.date < "2026-08-22") {
-          break; // Cannot schedule projects before Sec+ finishes
+        if (day.date < SECPLUS_START_DATE) {
+          break;
         }
       }
 
-      const availableSpace = day.maxCapacity - scheduledHours;
-      
+      const availableSpace = effectiveCap - scheduledHours;
+
       if (availableSpace >= 0.5) {
         if (task.duration <= availableSpace) {
           // Task fits fully
@@ -1072,7 +1102,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
               link: task.link
             });
             scheduledHours += part1Duration;
-            
+
             // Put Part 2 back in backlog
             const part2Duration = Math.round((task.duration - part1Duration) * 10) / 10;
             backlog[backlogIndex] = {
@@ -1391,6 +1421,7 @@ function reflowRemainingCurriculum() {
     appState.days[i].tasks.forEach(t => {
       const isCurriculum = t.category === "portswigger" || t.category === "aws" || t.category === "secplus";
       if (!t.completed && (isCurriculum || t.title.includes("Rolled Over"))) {
+        if (t.category === "secplus" && t.title.includes("Certification Exam")) return;
         curriculumBacklog.push({
           category: t.category,
           title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""),
@@ -1427,21 +1458,25 @@ function reflowRemainingCurriculum() {
       buildAHFTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
     
-    // LeetCode — exactly 1 problem per day (including Sunday and Monday)
+    // LeetCode — 2 problems per day from LEETCODE_START_2PERDAY onward
     const existingLc = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over"));
     lcIndex += existingLc.length;
-    if (existingLc.length === 0) {
-      const problem = BLIND_75_QUESTIONS[lcIndex % 75];
-      day.tasks.push({
-        id: `${day.date}_leetcode`,
-        category: "leetcode",
-        title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
-        duration: 0.5,
-        completed: false,
-        link: problem.link,
-        leetcodeId: problem.id
-      });
-      lcIndex++;
+    if (day.date >= LEETCODE_START_2PERDAY) {
+      const targetCount = 2;
+      const needed = targetCount - existingLc.length;
+      for (let j = 0; j < needed && lcIndex < 75; j++) {
+        const problem = BLIND_75_QUESTIONS[lcIndex % 75];
+        day.tasks.push({
+          id: `${day.date}_leetcode_${existingLc.length + j + 1}`,
+          category: "leetcode",
+          title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
+          duration: 0.5,
+          completed: false,
+          link: problem.link,
+          leetcodeId: problem.id
+        });
+        lcIndex++;
+      }
     }
 
     // (INFO 310 course removed — tracked separately in Canvas.)
@@ -1502,12 +1537,36 @@ function reflowRemainingCurriculum() {
     }
   });
 
-  // Sort backlog by original sequence
-  const categoryOrder = { "portswigger": 1, "aws": 2, "secplus": 3, "projects": 4 };
-  curriculumBacklog.sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
+  // Sort portswigger/aws first, then interleave secplus + projects
+  const reflowOther = curriculumBacklog.filter(t => t.category !== "secplus" && t.category !== "projects");
+  const reflowSec = curriculumBacklog.filter(t => t.category === "secplus");
+  const reflowProj = curriculumBacklog.filter(t => t.category === "projects");
+  const categoryOrder = { "portswigger": 1, "aws": 2 };
+  reflowOther.sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
+  curriculumBacklog.length = 0;
+  reflowOther.forEach(t => curriculumBacklog.push(t));
+  const reflowMaxLen = Math.max(reflowSec.length, reflowProj.length);
+  for (let i = 0; i < reflowMaxLen; i++) {
+    if (i < reflowSec.length) curriculumBacklog.push(reflowSec[i]);
+    if (i < reflowProj.length) curriculumBacklog.push(reflowProj[i]);
+  }
 
   // Distribute tasks
   distributeCurriculumTasks(appState.days, curriculumBacklog, startReflowIndex);
+
+  // Place Security+ exam on Aug 25 if not already there
+  const examDayReflow = appState.days.find(d => d.date === SECPLUS_EXAM_DATE);
+  if (examDayReflow && !examDayReflow.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
+    examDayReflow.tasks.push({
+      id: `${SECPLUS_EXAM_DATE}_sec_exam`,
+      category: "secplus",
+      title: "CompTIA Security+ SY0-701 Certification Exam",
+      duration: 2.5,
+      completed: false,
+      fixed: true,
+      link: "https://www.comptia.org/certifications/security"
+    });
+  }
 
   // Save State and Render
   saveState();
