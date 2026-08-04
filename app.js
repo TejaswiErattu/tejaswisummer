@@ -221,7 +221,7 @@ const BUILT_IN_EXTRACURRICULARS = [
     categoryId: "secplus",
     status: "active",
     weeklyHours: 10,
-    nextEvent: "Target: Aug 25",
+    nextEvent: "Target: Sept 2",
     notes: "Certification exam prep"
   },
   {
@@ -338,35 +338,53 @@ const CORE_CURRICULUM = {
     { id: "ps_lab_20", title: "PortSwigger Lab: Advanced XSS & CSP Bypasses", duration: 2, link: "https://portswigger.net/web-security/all-topics" }
   ],
   
-  // CompTIA Security+ Tasks (Track 3)
-  secplus: [
-    { id: "sec_mod_1a", title: "Security+ Study: Module 1 - General Security Concepts (Part A)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_1b", title: "Security+ Study: Module 1 - General Security Concepts (Part B)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_2a", title: "Security+ Study: Module 2 - Threats, Vulnerabilities & Mitigations (Part A)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_2b", title: "Security+ Study: Module 2 - Threats, Vulnerabilities & Mitigations (Part B)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_2c", title: "Security+ Study: Module 2 - Threats, Vulnerabilities & Mitigations (Part C)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_3a", title: "Security+ Study: Module 3 - Security Architecture (Part A)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_3b", title: "Security+ Study: Module 3 - Security Architecture (Part B)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_3c", title: "Security+ Study: Module 3 - Security Architecture (Part C)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_4a", title: "Security+ Study: Module 4 - Security Operations (Part A)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_4b", title: "Security+ Study: Module 4 - Security Operations (Part B)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_4c", title: "Security+ Study: Module 4 - Security Operations (Part C)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_5a", title: "Security+ Study: Module 5 - Security Program Management (Part A)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_mod_5b", title: "Security+ Study: Module 5 - Security Program Management (Part B)", duration: 2.5, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_prac_1", title: "Security+ Dion Practice Exam 1 & Explanations", duration: 2, link: "https://www.udemy.com/course/securityplus/" },
-    { id: "sec_prac_2", title: "Security+ Dion Practice Exam 2 & Explanations", duration: 2, link: "https://www.udemy.com/course/securityplus/" },
-    { id: "sec_prac_3", title: "Security+ Dion Practice Exam 3 & Explanations", duration: 2, link: "https://www.udemy.com/course/securityplus/" },
-    { id: "sec_prac_4", title: "Security+ Dion Practice Exam 4 & Explanations", duration: 2, link: "https://www.udemy.com/course/securityplus/" },
-    { id: "sec_review", title: "Security+ Messer Videos Speed Run & Notes Review", duration: 2, link: "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/" },
-    { id: "sec_exam", title: "CompTIA Security+ SY0-701 Certification Exam", duration: 2.5, link: "https://www.comptia.org/certifications/security" }
-  ]
+  // CompTIA Security+ Tasks (Track 3) — 30-day fixed daily plan (Aug 3 - Sep 1, 2026)
+  // Each task is pinned to a specific plan day and mapped to a real date by applySecplusDailyPlan.
+  // Videos/PDFs use the Professor Messer link; practice exams use the Dion link.
+  secplus: (function() {
+    const MESSER = "https://www.professormesser.com/security-plus/sy0-701/sy0-701-video/sy0-701-comptia-security-plus-course/";
+    const DION = "https://www.udemy.com/course/securityplus/";
+    const plan = [
+      { planDay: 1,  title: "Security+ Day 1: Watch sections 1 and 2 (download PDFs)", duration: 2.5, link: MESSER },
+      { planDay: 2,  title: "Security+ Day 2: Watch sections 3 and 4", duration: 2.5, link: MESSER },
+      { planDay: 3,  title: "Security+ Day 3: Watch sections 5 and 6", duration: 2.5, link: MESSER },
+      { planDay: 4,  title: "Security+ Day 4: Watch sections 7 and 8", duration: 2.5, link: MESSER },
+      { planDay: 5,  title: "Security+ Day 5: Watch sections 9, 10, and 11", duration: 2.5, link: MESSER },
+      { planDay: 6,  title: "Security+ Day 6: Watch sections 12 and 13", duration: 2.5, link: MESSER },
+      { planDay: 7,  title: "Security+ Day 7: Watch sections 14 and 15", duration: 2.5, link: MESSER },
+      { planDay: 8,  title: "Security+ Day 8: Watch section 16", duration: 2.5, link: MESSER },
+      { planDay: 9,  title: "Security+ Day 9: Watch sections 17 and 18", duration: 2.5, link: MESSER },
+      { planDay: 10, title: "Security+ Day 10: Watch sections 19 and 20", duration: 2.5, link: MESSER },
+      { planDay: 11, title: "Security+ Day 11: Watch sections 21 and 22", duration: 2.5, link: MESSER },
+      { planDay: 12, title: "Security+ Day 12: Watch sections 23 and 24", duration: 2.5, link: MESSER },
+      { planDay: 13, title: "Security+ Day 13: Watch sections 25 and 26", duration: 2.5, link: MESSER },
+      { planDay: 14, title: "Security+ Day 14: Watch sections 27 and 28", duration: 2.5, link: MESSER },
+      { planDay: 15, title: "Security+ Day 15: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 16, title: "Security+ Day 16: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 17, title: "Security+ Day 17: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 18, title: "Security+ Day 18: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 19, title: "Security+ Day 19: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 20, title: "Security+ Day 20: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 21, title: "Security+ Day 21: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 22, title: "Security+ Day 22: Take 2 Practice Exams", duration: 2, link: DION },
+      { planDay: 23, title: "Security+ Day 23: Take 2 Practice Exams", duration: 2, link: DION },
+      { planDay: 24, title: "Security+ Day 24: Take 2 Practice Exams", duration: 2, link: DION },
+      { planDay: 25, title: "Security+ Day 25: Retake 3 Practice Exams", duration: 2, link: DION },
+      { planDay: 26, title: "Security+ Day 26: Retake 3 Practice Exams", duration: 2, link: DION },
+      { planDay: 27, title: "Security+ Day 27: Retake 3 Practice Exams", duration: 2, link: DION },
+      { planDay: 28, title: "Security+ Day 28: Retake 3 Practice Exams", duration: 2, link: DION },
+      { planDay: 29, title: "Security+ Day 29: Retake 3 Practice Exams", duration: 2, link: DION },
+      { planDay: 30, title: "Security+ Day 30: Retake 2 Practice Exams", duration: 2, link: DION }
+    ];
+    return plan.map(t => Object.assign({ id: `sec_d${t.planDay}` }, t));
+  })()
 };
 
 // 4. GLOBAL STATE VARIABLES
 
 // Bump this whenever the schedule-generation logic changes. On load, saved states
 // (local + cloud) with an older version auto-migrate while preserving completed tasks.
-const SCHEDULE_VERSION = 5;
+const SCHEDULE_VERSION = 6;
 const PLAN_TIMEZONE = "America/Los_Angeles";
 
 let appState = {
@@ -389,13 +407,14 @@ let appState = {
 
 // Date constants
 const START_DATE_STR = "2026-06-13";
-const END_DATE_STR = "2026-09-01";
+const END_DATE_STR = "2026-09-02";
 const INDIA_START_STR = "2026-06-24";
 const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
 const INFO_END_STR = "2026-08-21";
-const SECPLUS_START_DATE = "2026-08-01";
-const SECPLUS_EXAM_DATE = "2026-08-25";
+const SECPLUS_START_DATE = "2026-08-03";
+const SECPLUS_EXAM_DATE = "2026-09-02";
+const SECPLUS_PLAN_DEADLINE = "2026-09-02";
 const LEETCODE_START_2PERDAY = "2026-07-26";
 
 // Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
@@ -961,36 +980,27 @@ function generateBaseSchedule() {
     });
   });
 
-  // Add Security+ Tasks (Track 3) and Projects (Track 4) — interleaved so
-  // they distribute concurrently across August instead of sequentially.
-  const secplusBacklog = [];
-  CORE_CURRICULUM.secplus.forEach(t => {
-    if (t.id === "sec_exam") return;
-    secplusBacklog.push({ category: "secplus", title: t.title, duration: t.duration, link: t.link });
-  });
-
-  const projectsBacklog = [];
+  // Projects (Track 4) still distribute via capacity packing.
+  // Security+ (Track 3) is NOT interleaved anymore — it's placed by
+  // applySecplusDailyPlan onto fixed dates (one plan day per calendar day).
   appState.settings.selectedProjects.forEach(projId => {
     const proj = TRACK_4_PROJECTS.find(p => p.id === projId);
     if (proj) {
       proj.tasks.forEach(t => {
-        projectsBacklog.push({ category: "projects", title: t.name, duration: t.duration, link: "https://bestprojectideas.com/cybersecurity-project-ideas/" });
+        curriculumBacklog.push({ category: "projects", title: t.name, duration: t.duration, link: "https://bestprojectideas.com/cybersecurity-project-ideas/" });
       });
     }
   });
 
-  const maxBacklogLen = Math.max(secplusBacklog.length, projectsBacklog.length);
-  for (let i = 0; i < maxBacklogLen; i++) {
-    if (i < secplusBacklog.length) curriculumBacklog.push(secplusBacklog[i]);
-    if (i < projectsBacklog.length) curriculumBacklog.push(projectsBacklog[i]);
-  }
-
   // Schedule Curriculum Tasks sequentially into the calendar days
   distributeCurriculumTasks(daysList, curriculumBacklog, 0);
 
-  // Place Security+ exam on Aug 25 as a fixed task
+  // Apply the fixed 30-day Security+ plan (Day 1 = SECPLUS_START_DATE)
+  applySecplusDailyPlan(daysList);
+
+  // Place Security+ exam on the deadline (Sept 2) as a fixed task
   const examDay = daysList.find(d => d.date === SECPLUS_EXAM_DATE);
-  if (examDay) {
+  if (examDay && !examDay.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
     examDay.tasks.push({
       id: `${SECPLUS_EXAM_DATE}_sec_exam`,
       category: "secplus",
@@ -1003,6 +1013,47 @@ function generateBaseSchedule() {
   }
 
   appState.days = daysList;
+}
+
+// Map each 30-day Security+ plan entry to a specific date starting SECPLUS_START_DATE.
+// If a plan day would fall past SECPLUS_PLAN_DEADLINE, its task stacks onto
+// SECPLUS_START_DATE (overflow → today). Preserves any completed Sec+ tasks: if a
+// task with the same planDay is already completed anywhere, it is not re-added.
+function applySecplusDailyPlan(daysList) {
+  const startDate = parseDate(SECPLUS_START_DATE);
+  const deadline = parseDate(SECPLUS_PLAN_DEADLINE);
+
+  const completedPlanDays = new Set();
+  daysList.forEach(d => d.tasks.forEach(t => {
+    if (t.category === "secplus" && t.completed && typeof t.planDay === "number") {
+      completedPlanDays.add(t.planDay);
+    }
+  }));
+
+  CORE_CURRICULUM.secplus.forEach(task => {
+    if (completedPlanDays.has(task.planDay)) return;
+
+    const target = new Date(startDate);
+    target.setDate(target.getDate() + (task.planDay - 1));
+    let dateStr = formatDate(target);
+    if (target > deadline) dateStr = SECPLUS_START_DATE;
+
+    const day = daysList.find(d => d.date === dateStr);
+    if (!day) return;
+
+    const already = day.tasks.some(t => t.category === "secplus" && t.planDay === task.planDay);
+    if (already) return;
+
+    day.tasks.push({
+      id: `${dateStr}_${task.id}`,
+      category: "secplus",
+      title: task.title,
+      duration: task.duration,
+      completed: false,
+      link: task.link,
+      planDay: task.planDay
+    });
+  });
 }
 
 // 7. SCHEDULER ENGINE - TASK DISTRIBUTOR / REFLOW ENGINE
@@ -1419,9 +1470,11 @@ function reflowRemainingCurriculum() {
   const curriculumBacklog = [];
   for (let i = startReflowIndex; i < appState.days.length; i++) {
     appState.days[i].tasks.forEach(t => {
-      const isCurriculum = t.category === "portswigger" || t.category === "aws" || t.category === "secplus";
+      // Security+ is placed by applySecplusDailyPlan, not by capacity-based reflow.
+      // Skip incomplete Sec+ tasks here so they're dropped and re-issued from the fixed plan.
+      if (t.category === "secplus") return;
+      const isCurriculum = t.category === "portswigger" || t.category === "aws";
       if (!t.completed && (isCurriculum || t.title.includes("Rolled Over"))) {
-        if (t.category === "secplus" && t.title.includes("Certification Exam")) return;
         curriculumBacklog.push({
           category: t.category,
           title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""),
@@ -1537,24 +1590,22 @@ function reflowRemainingCurriculum() {
     }
   });
 
-  // Sort portswigger/aws first, then interleave secplus + projects
-  const reflowOther = curriculumBacklog.filter(t => t.category !== "secplus" && t.category !== "projects");
-  const reflowSec = curriculumBacklog.filter(t => t.category === "secplus");
+  // Sort portswigger/aws first, then projects. Sec+ is handled separately by applySecplusDailyPlan.
+  const reflowOther = curriculumBacklog.filter(t => t.category !== "projects");
   const reflowProj = curriculumBacklog.filter(t => t.category === "projects");
   const categoryOrder = { "portswigger": 1, "aws": 2 };
   reflowOther.sort((a, b) => (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99));
   curriculumBacklog.length = 0;
   reflowOther.forEach(t => curriculumBacklog.push(t));
-  const reflowMaxLen = Math.max(reflowSec.length, reflowProj.length);
-  for (let i = 0; i < reflowMaxLen; i++) {
-    if (i < reflowSec.length) curriculumBacklog.push(reflowSec[i]);
-    if (i < reflowProj.length) curriculumBacklog.push(reflowProj[i]);
-  }
+  reflowProj.forEach(t => curriculumBacklog.push(t));
 
-  // Distribute tasks
+  // Distribute non-Sec+ curriculum
   distributeCurriculumTasks(appState.days, curriculumBacklog, startReflowIndex);
 
-  // Place Security+ exam on Aug 25 if not already there
+  // Apply the fixed 30-day Security+ plan (preserves completed Sec+ tasks by planDay)
+  applySecplusDailyPlan(appState.days);
+
+  // Place Security+ exam on the deadline (Sept 2) if not already there
   const examDayReflow = appState.days.find(d => d.date === SECPLUS_EXAM_DATE);
   if (examDayReflow && !examDayReflow.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
     examDayReflow.tasks.push({
