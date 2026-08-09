@@ -338,7 +338,7 @@ const CORE_CURRICULUM = {
     { id: "ps_lab_20", title: "PortSwigger Lab: Advanced XSS & CSP Bypasses", duration: 2, link: "https://portswigger.net/web-security/all-topics" }
   ],
   
-  // CompTIA Security+ Tasks (Track 3) — 30-day fixed daily plan (Aug 3 - Sep 1, 2026)
+  // CompTIA Security+ Tasks (Track 3) — 29-day fixed daily plan (Aug 3 - Aug 31, 2026); exam Sep 1.
   // Each task is pinned to a specific plan day and mapped to a real date by applySecplusDailyPlan.
   // Videos/PDFs use the Professor Messer link; practice exams use the Dion link.
   secplus: (function() {
@@ -352,29 +352,28 @@ const CORE_CURRICULUM = {
       { planDay: 5,  title: "Security+ Day 5: Watch sections 9, 10, and 11", duration: 2.5, link: MESSER },
       { planDay: 6,  title: "Security+ Day 6: Watch sections 12 and 13", duration: 2.5, link: MESSER },
       { planDay: 7,  title: "Security+ Day 7: Watch sections 14 and 15", duration: 2.5, link: MESSER },
-      { planDay: 8,  title: "Security+ Day 8: Watch section 16", duration: 2.5, link: MESSER },
-      { planDay: 9,  title: "Security+ Day 9: Watch sections 17 and 18", duration: 2.5, link: MESSER },
-      { planDay: 10, title: "Security+ Day 10: Watch sections 19 and 20", duration: 2.5, link: MESSER },
-      { planDay: 11, title: "Security+ Day 11: Watch sections 21 and 22", duration: 2.5, link: MESSER },
-      { planDay: 12, title: "Security+ Day 12: Watch sections 23 and 24", duration: 2.5, link: MESSER },
-      { planDay: 13, title: "Security+ Day 13: Watch sections 25 and 26", duration: 2.5, link: MESSER },
-      { planDay: 14, title: "Security+ Day 14: Watch sections 27 and 28", duration: 2.5, link: MESSER },
-      { planDay: 15, title: "Security+ Day 15: Take 1 Practice Exam", duration: 2, link: DION },
-      { planDay: 16, title: "Security+ Day 16: Take 1 Practice Exam", duration: 2, link: DION },
-      { planDay: 17, title: "Security+ Day 17: Take 1 Practice Exam", duration: 2, link: DION },
-      { planDay: 18, title: "Security+ Day 18: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 8,  title: "Security+ Day 8: Watch sections 10 and 11", duration: 2.5, link: MESSER },
+      { planDay: 9,  title: "Security+ Day 9: Watch sections 12 and 13", duration: 2.5, link: MESSER },
+      { planDay: 10, title: "Security+ Day 10: Watch sections 14 and 15", duration: 2.5, link: MESSER },
+      { planDay: 11, title: "Security+ Day 11: Watch section 16", duration: 2.5, link: MESSER },
+      { planDay: 12, title: "Security+ Day 12: Watch sections 17 and 18", duration: 2.5, link: MESSER },
+      { planDay: 13, title: "Security+ Day 13: Watch sections 19 and 20", duration: 2.5, link: MESSER },
+      { planDay: 14, title: "Security+ Day 14: Review sections 1-20", duration: 2.5, link: MESSER },
+      { planDay: 15, title: "Security+ Day 15: Watch sections 21 and 22", duration: 2.5, link: MESSER },
+      { planDay: 16, title: "Security+ Day 16: Watch sections 23 and 24", duration: 2.5, link: MESSER },
+      { planDay: 17, title: "Security+ Day 17: Watch sections 25 and 26", duration: 2.5, link: MESSER },
+      { planDay: 18, title: "Security+ Day 18: Watch sections 27 and 28", duration: 2.5, link: MESSER },
       { planDay: 19, title: "Security+ Day 19: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 20, title: "Security+ Day 20: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 21, title: "Security+ Day 21: Take 1 Practice Exam", duration: 2, link: DION },
-      { planDay: 22, title: "Security+ Day 22: Take 2 Practice Exams", duration: 2, link: DION },
-      { planDay: 23, title: "Security+ Day 23: Take 2 Practice Exams", duration: 2, link: DION },
-      { planDay: 24, title: "Security+ Day 24: Take 2 Practice Exams", duration: 2, link: DION },
-      { planDay: 25, title: "Security+ Day 25: Retake 3 Practice Exams", duration: 2, link: DION },
-      { planDay: 26, title: "Security+ Day 26: Retake 3 Practice Exams", duration: 2, link: DION },
-      { planDay: 27, title: "Security+ Day 27: Retake 3 Practice Exams", duration: 2, link: DION },
-      { planDay: 28, title: "Security+ Day 28: Retake 3 Practice Exams", duration: 2, link: DION },
-      { planDay: 29, title: "Security+ Day 29: Retake 3 Practice Exams", duration: 2, link: DION },
-      { planDay: 30, title: "Security+ Day 30: Retake 2 Practice Exams", duration: 2, link: DION }
+      { planDay: 22, title: "Security+ Day 22: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 23, title: "Security+ Day 23: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 24, title: "Security+ Day 24: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 25, title: "Security+ Day 25: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 26, title: "Security+ Day 26: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 27, title: "Security+ Day 27: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 28, title: "Security+ Day 28: Take 1 Practice Exam", duration: 2, link: DION },
+      { planDay: 29, title: "Security+ Day 29: Final review (weak areas + missed questions)", duration: 2.5, link: MESSER }
     ];
     return plan.map(t => Object.assign({ id: `sec_d${t.planDay}` }, t));
   })()
@@ -384,7 +383,7 @@ const CORE_CURRICULUM = {
 
 // Bump this whenever the schedule-generation logic changes. On load, saved states
 // (local + cloud) with an older version auto-migrate while preserving completed tasks.
-const SCHEDULE_VERSION = 6;
+const SCHEDULE_VERSION = 7;
 const PLAN_TIMEZONE = "America/Los_Angeles";
 
 let appState = {
@@ -413,8 +412,8 @@ const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
 const INFO_END_STR = "2026-08-21";
 const SECPLUS_START_DATE = "2026-08-03";
-const SECPLUS_EXAM_DATE = "2026-09-02";
-const SECPLUS_PLAN_DEADLINE = "2026-09-02";
+const SECPLUS_EXAM_DATE = "2026-09-01";
+const SECPLUS_PLAN_DEADLINE = "2026-09-01";
 const LEETCODE_START_2PERDAY = "2026-07-26";
 
 // Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
@@ -998,7 +997,7 @@ function generateBaseSchedule() {
   // Apply the fixed 30-day Security+ plan (Day 1 = SECPLUS_START_DATE)
   applySecplusDailyPlan(daysList);
 
-  // Place Security+ exam on the deadline (Sept 2) as a fixed task
+  // Place Security+ exam on the deadline (Sept 1) as a fixed task
   const examDay = daysList.find(d => d.date === SECPLUS_EXAM_DATE);
   if (examDay && !examDay.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
     examDay.tasks.push({
@@ -1605,7 +1604,7 @@ function reflowRemainingCurriculum() {
   // Apply the fixed 30-day Security+ plan (preserves completed Sec+ tasks by planDay)
   applySecplusDailyPlan(appState.days);
 
-  // Place Security+ exam on the deadline (Sept 2) if not already there
+  // Place Security+ exam on the deadline (Sept 1) if not already there
   const examDayReflow = appState.days.find(d => d.date === SECPLUS_EXAM_DATE);
   if (examDayReflow && !examDayReflow.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
     examDayReflow.tasks.push({
