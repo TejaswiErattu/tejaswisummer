@@ -353,16 +353,19 @@ const CORE_CURRICULUM = {
       { planDay: 6,  title: "Security+ Day 6: Watch sections 12 and 13", duration: 2.5, link: MESSER },
       { planDay: 7,  title: "Security+ Day 7: Watch sections 14 and 15", duration: 2.5, link: MESSER },
       { planDay: 8,  title: "Security+ Day 8: Watch sections 10 and 11", duration: 2.5, link: MESSER },
-      { planDay: 9,  title: "Security+ Day 9: Watch sections 12 and 13", duration: 2.5, link: MESSER },
-      { planDay: 10, title: "Security+ Day 10: Watch sections 14 and 15", duration: 2.5, link: MESSER },
-      { planDay: 11, title: "Security+ Day 11: Watch section 16", duration: 2.5, link: MESSER },
-      { planDay: 12, title: "Security+ Day 12: Watch sections 17 and 18", duration: 2.5, link: MESSER },
-      { planDay: 13, title: "Security+ Day 13: Watch sections 19 and 20", duration: 2.5, link: MESSER },
+      // Aug 11-17: 1 section/day (lightened for Microsoft OA week). Aug 16 (Day 14) stays as Review.
+      { planDay: 9,  title: "Security+ Day 9: Watch section 12", duration: 1.5, link: MESSER },
+      { planDay: 10, title: "Security+ Day 10: Watch section 13", duration: 1.5, link: MESSER },
+      { planDay: 11, title: "Security+ Day 11: Watch section 14", duration: 1.5, link: MESSER },
+      { planDay: 12, title: "Security+ Day 12: Watch section 15", duration: 1.5, link: MESSER },
+      { planDay: 13, title: "Security+ Day 13: Watch section 16", duration: 1.5, link: MESSER },
       { planDay: 14, title: "Security+ Day 14: Review sections 1-20", duration: 2.5, link: MESSER },
-      { planDay: 15, title: "Security+ Day 15: Watch sections 21 and 22", duration: 2.5, link: MESSER },
-      { planDay: 16, title: "Security+ Day 16: Watch sections 23 and 24", duration: 2.5, link: MESSER },
-      { planDay: 17, title: "Security+ Day 17: Watch sections 25 and 26", duration: 2.5, link: MESSER },
-      { planDay: 18, title: "Security+ Day 18: Watch sections 27 and 28", duration: 2.5, link: MESSER },
+      { planDay: 15, title: "Security+ Day 15: Watch section 17", duration: 1.5, link: MESSER },
+      // Aug 18-20: resume 2 sections/day to cover the displaced material.
+      { planDay: 16, title: "Security+ Day 16: Watch sections 18 and 19", duration: 2.5, link: MESSER },
+      { planDay: 17, title: "Security+ Day 17: Watch sections 20 and 21", duration: 2.5, link: MESSER },
+      { planDay: 18, title: "Security+ Day 18: Watch sections 22 and 23", duration: 2.5, link: MESSER },
+      // Aug 21-30: practice exams. Aug 21-25 pair with a section (24-28) to finish material displaced from OA week.
       { planDay: 19, title: "Security+ Day 19: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 20, title: "Security+ Day 20: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 21, title: "Security+ Day 21: Take 1 Practice Exam", duration: 2, link: DION },
@@ -373,7 +376,13 @@ const CORE_CURRICULUM = {
       { planDay: 26, title: "Security+ Day 26: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 27, title: "Security+ Day 27: Take 1 Practice Exam", duration: 2, link: DION },
       { planDay: 28, title: "Security+ Day 28: Take 1 Practice Exam", duration: 2, link: DION },
-      { planDay: 29, title: "Security+ Day 29: Final review (weak areas + missed questions)", duration: 2.5, link: MESSER }
+      { planDay: 29, title: "Security+ Day 29: Final review (weak areas + missed questions)", duration: 2.5, link: MESSER },
+      // Displaced-section pairings (paired with practice exams on Aug 21-25).
+      { planDay: 30, dateOverride: "2026-08-21", title: "Security+ Day 19 extra: Watch section 24", duration: 1.5, link: MESSER },
+      { planDay: 31, dateOverride: "2026-08-22", title: "Security+ Day 20 extra: Watch section 25", duration: 1.5, link: MESSER },
+      { planDay: 32, dateOverride: "2026-08-23", title: "Security+ Day 21 extra: Watch section 26", duration: 1.5, link: MESSER },
+      { planDay: 33, dateOverride: "2026-08-24", title: "Security+ Day 22 extra: Watch section 27", duration: 1.5, link: MESSER },
+      { planDay: 34, dateOverride: "2026-08-25", title: "Security+ Day 23 extra: Watch section 28", duration: 1.5, link: MESSER }
     ];
     return plan.map(t => Object.assign({ id: `sec_d${t.planDay}` }, t));
   })()
@@ -383,7 +392,7 @@ const CORE_CURRICULUM = {
 
 // Bump this whenever the schedule-generation logic changes. On load, saved states
 // (local + cloud) with an older version auto-migrate while preserving completed tasks.
-const SCHEDULE_VERSION = 7;
+const SCHEDULE_VERSION = 8;
 const PLAN_TIMEZONE = "America/Los_Angeles";
 
 let appState = {
@@ -875,8 +884,22 @@ function generateBaseSchedule() {
       dayObj.tasks.push(task);
     });
     
-    // 2. LeetCode (2 problems/day from LEETCODE_START_2PERDAY onward)
-    if (dateStr >= LEETCODE_START_2PERDAY) {
+    // 2. LeetCode — Microsoft OA prep (Aug 11-17) overrides Blind 75 with 6 targeted problems.
+    //    Otherwise, 2 Blind 75 problems/day from LEETCODE_START_2PERDAY onward.
+    if (typeof MICROSOFT_OA_OVERRIDE !== "undefined" && MICROSOFT_OA_OVERRIDE[dateStr]) {
+      MICROSOFT_OA_OVERRIDE[dateStr].forEach((p, i) => {
+        dayObj.tasks.push({
+          id: `${dateStr}_msoa_${i + 1}`,
+          category: "leetcode",
+          title: `Microsoft OA Prep: LC #${p.id} - ${p.name}`,
+          duration: 0.75,
+          completed: false,
+          link: p.link,
+          leetcodeId: p.id,
+          microsoftOA: true
+        });
+      });
+    } else if (dateStr >= LEETCODE_START_2PERDAY) {
       dayObj.tasks.push({
         id: `${dateStr}_leetcode_1`,
         category: "leetcode",
@@ -937,11 +960,12 @@ function generateBaseSchedule() {
     current.setDate(current.getDate() + 1);
   }
 
-  // Assign LeetCode questions: 2/day from LEETCODE_START_2PERDAY, remove excess placeholders
+  // Assign LeetCode questions: 2/day from LEETCODE_START_2PERDAY, remove excess placeholders.
+  // Microsoft OA override tasks (microsoftOA:true) are already assigned and do not consume Blind 75 slots.
   let lcIndex = 0;
   for (let i = 0; i < daysList.length; i++) {
     const day = daysList[i];
-    const lcTasks = day.tasks.filter(t => t.category === "leetcode");
+    const lcTasks = day.tasks.filter(t => t.category === "leetcode" && !t.microsoftOA);
     for (const lcTask of lcTasks) {
       if (lcIndex < 75) {
         lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex].id} - ${BLIND_75_QUESTIONS[lcIndex].name}`;
@@ -1034,8 +1058,8 @@ function applySecplusDailyPlan(daysList) {
 
     const target = new Date(startDate);
     target.setDate(target.getDate() + (task.planDay - 1));
-    let dateStr = formatDate(target);
-    if (target > deadline) dateStr = SECPLUS_START_DATE;
+    let dateStr = task.dateOverride || formatDate(target);
+    if (!task.dateOverride && target > deadline) dateStr = SECPLUS_START_DATE;
 
     const day = daysList.find(d => d.date === dateStr);
     if (!day) return;
@@ -1451,13 +1475,13 @@ function reflowRemainingCurriculum() {
     }
   }
 
-  // Pre-calculate the correct LeetCode Blind 75 question index up to startReflowIndex
+  // Pre-calculate the correct LeetCode Blind 75 question index up to startReflowIndex.
+  // Microsoft OA override tasks do NOT advance the Blind 75 index.
   let lcIndex = 0;
   for (let i = 0; i < startReflowIndex; i++) {
     const d = appState.days[i];
     d.tasks.forEach(t => {
-      // Only count standard LeetCode tasks, not rolled-over ones
-      if (t.category === "leetcode" && !t.title.includes("Rolled Over")) {
+      if (t.category === "leetcode" && !t.title.includes("Rolled Over") && !t.microsoftOA) {
         lcIndex++;
       }
     });
@@ -1510,10 +1534,28 @@ function reflowRemainingCurriculum() {
       buildAHFTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
     
-    // LeetCode — 2 problems per day from LEETCODE_START_2PERDAY onward
+    // LeetCode — Microsoft OA prep override (Aug 11-17) uses a fixed 6-problem set;
+    // otherwise, 2 Blind 75 problems per day from LEETCODE_START_2PERDAY onward.
     const existingLc = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over"));
-    lcIndex += existingLc.length;
-    if (day.date >= LEETCODE_START_2PERDAY) {
+    // Only completed Blind 75 tasks advance the sequential index — MS OA tasks don't.
+    lcIndex += existingLc.filter(t => !t.microsoftOA).length;
+    const msOaSet = (typeof MICROSOFT_OA_OVERRIDE !== "undefined") ? MICROSOFT_OA_OVERRIDE[day.date] : null;
+    if (msOaSet) {
+      const existingIds = new Set(existingLc.map(t => t.leetcodeId));
+      msOaSet.forEach((p, i) => {
+        if (existingIds.has(p.id)) return;
+        day.tasks.push({
+          id: `${day.date}_msoa_${i + 1}`,
+          category: "leetcode",
+          title: `Microsoft OA Prep: LC #${p.id} - ${p.name}`,
+          duration: 0.75,
+          completed: false,
+          link: p.link,
+          leetcodeId: p.id,
+          microsoftOA: true
+        });
+      });
+    } else if (day.date >= LEETCODE_START_2PERDAY) {
       const targetCount = 2;
       const needed = targetCount - existingLc.length;
       for (let j = 0; j < needed && lcIndex < 75; j++) {

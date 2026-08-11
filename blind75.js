@@ -99,3 +99,65 @@ const BLIND_75_QUESTIONS = [
   // Additional String/Core (1)
   { id: 75, name: "Encode and Decode Strings", category: "Strings", link: "https://leetcode.com/problems/encode-and-decode-strings/" }
 ];
+
+// Microsoft OA prep override for the week leading up to the OA on 2026-08-17.
+// On these dates, Blind 75 is suspended and replaced with the problems below.
+// Blind 75 sequential index does NOT advance across these dates.
+const MICROSOFT_OA_OVERRIDE = {
+  "2026-08-11": [
+    { id: 1, name: "Two Sum", link: "https://leetcode.com/problems/two-sum/" },
+    { id: 242, name: "Valid Anagram", link: "https://leetcode.com/problems/valid-anagram/" },
+    { id: 49, name: "Group Anagrams", link: "https://leetcode.com/problems/group-anagrams/" },
+    { id: 238, name: "Product of Array Except Self", link: "https://leetcode.com/problems/product-of-array-except-self/" },
+    { id: 128, name: "Longest Consecutive Sequence", link: "https://leetcode.com/problems/longest-consecutive-sequence/" },
+    { id: 15, name: "3Sum", link: "https://leetcode.com/problems/3sum/" }
+  ],
+  "2026-08-12": [
+    { id: 3, name: "Longest Substring Without Repeating Characters", link: "https://leetcode.com/problems/longest-substring-without-repeating-characters/" },
+    { id: 567, name: "Permutation in String", link: "https://leetcode.com/problems/permutation-in-string/" },
+    { id: 1004, name: "Max Consecutive Ones III", link: "https://leetcode.com/problems/max-consecutive-ones-iii/" },
+    { id: 438, name: "Find All Anagrams in a String", link: "https://leetcode.com/problems/find-all-anagrams-in-a-string/" },
+    { id: 424, name: "Longest Repeating Character Replacement", link: "https://leetcode.com/problems/longest-repeating-character-replacement/" },
+    { id: 76, name: "Minimum Window Substring", link: "https://leetcode.com/problems/minimum-window-substring/" }
+  ],
+  "2026-08-13": [
+    { id: 200, name: "Number of Islands", link: "https://leetcode.com/problems/number-of-islands/" },
+    { id: 994, name: "Rotting Oranges", link: "https://leetcode.com/problems/rotting-oranges/" },
+    { id: 752, name: "Open the Lock", link: "https://leetcode.com/problems/open-the-lock/" },
+    { id: 207, name: "Course Schedule", link: "https://leetcode.com/problems/course-schedule/" },
+    { id: 1466, name: "Reorder Routes to Make All Paths Lead to City Zero", link: "https://leetcode.com/problems/reorder-routes-to-make-all-paths-lead-to-the-city-zero/" },
+    { id: 133, name: "Clone Graph", link: "https://leetcode.com/problems/clone-graph/" }
+  ],
+  "2026-08-14": [
+    { id: 198, name: "House Robber", link: "https://leetcode.com/problems/house-robber/" },
+    { id: 322, name: "Coin Change", link: "https://leetcode.com/problems/coin-change/" },
+    { id: 416, name: "Partition Equal Subset Sum", link: "https://leetcode.com/problems/partition-equal-subset-sum/" },
+    { id: 62, name: "Unique Paths", link: "https://leetcode.com/problems/unique-paths/" },
+    { id: 300, name: "Longest Increasing Subsequence", link: "https://leetcode.com/problems/longest-increasing-subsequence/" },
+    { id: 91, name: "Decode Ways", link: "https://leetcode.com/problems/decode-ways/" }
+  ],
+  "2026-08-15": [
+    { id: 206, name: "Reverse Linked List", link: "https://leetcode.com/problems/reverse-linked-list/" },
+    { id: 102, name: "Binary Tree Level Order Traversal", link: "https://leetcode.com/problems/binary-tree-level-order-traversal/" },
+    { id: 98, name: "Validate Binary Search Tree", link: "https://leetcode.com/problems/validate-binary-search-tree/" },
+    { id: 155, name: "Min Stack", link: "https://leetcode.com/problems/min-stack/" },
+    { id: 215, name: "Kth Largest Element in an Array", link: "https://leetcode.com/problems/kth-largest-element-in-an-array/" },
+    { id: 2246, name: "Longest Path With Different Adjacent Characters", link: "https://leetcode.com/problems/longest-path-with-different-adjacent-characters/" }
+  ],
+  "2026-08-16": [
+    { id: 1797, name: "Design Authentication Manager", link: "https://leetcode.com/problems/design-authentication-manager/" },
+    { id: 146, name: "LRU Cache", link: "https://leetcode.com/problems/lru-cache/" },
+    { id: 347, name: "Top K Frequent Elements", link: "https://leetcode.com/problems/top-k-frequent-elements/" },
+    { id: 56, name: "Merge Intervals", link: "https://leetcode.com/problems/merge-intervals/" },
+    { id: 134, name: "Gas Station", link: "https://leetcode.com/problems/gas-station/" },
+    { id: 621, name: "Task Scheduler", link: "https://leetcode.com/problems/task-scheduler/" }
+  ],
+  "2026-08-17": [
+    { id: 1797, name: "MS OA Sim — Redo: Design Authentication Manager", link: "https://leetcode.com/problems/design-authentication-manager/" },
+    { id: 3, name: "MS OA Sim — Redo: Longest Substring Without Repeating Characters", link: "https://leetcode.com/problems/longest-substring-without-repeating-characters/" },
+    { id: 567, name: "MS OA Sim — Redo: Permutation in String", link: "https://leetcode.com/problems/permutation-in-string/" },
+    { id: 994, name: "MS OA Sim — Redo: Rotting Oranges", link: "https://leetcode.com/problems/rotting-oranges/" },
+    { id: 1466, name: "MS OA Sim — Redo: Reorder Routes to Make All Paths Lead to City Zero", link: "https://leetcode.com/problems/reorder-routes-to-make-all-paths-lead-to-the-city-zero/" },
+    { id: 416, name: "MS OA Sim — Redo: Partition Equal Subset Sum", link: "https://leetcode.com/problems/partition-equal-subset-sum/" }
+  ]
+};
