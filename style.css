@@ -32,6 +32,10 @@
   --cat-palana: #ff85a2;       /* Bright candy pink */
   --cat-github: #ffea79;       /* Soft yellow */
   --cat-projects: #e2bbfd;     /* Lilac */
+  --cat-awscp: #7fd8ff;        /* Sky blue */
+  --cat-jobapps: #ffc48c;      /* Warm apricot */
+  --cat-interviews: #b9f6a5;   /* Fresh green */
+  --cat-hackathons: #ff9ff3;   /* Neon pink */
 
   --font-mono: 'Share Tech Mono', monospace;
   --font-sans: 'Outfit', 'Inter', sans-serif;
@@ -620,6 +624,10 @@ input:checked + .slider:before {
 .dot-palana { background: var(--cat-palana); box-shadow: 0 0 6px var(--cat-palana); }
 .dot-github { background: var(--cat-github); box-shadow: 0 0 6px var(--cat-github); }
 .dot-projects { background: var(--cat-projects); box-shadow: 0 0 6px var(--cat-projects); }
+.dot-awscp { background: var(--cat-awscp); box-shadow: 0 0 6px var(--cat-awscp); }
+.dot-jobapps { background: var(--cat-jobapps); box-shadow: 0 0 6px var(--cat-jobapps); }
+.dot-interviews { background: var(--cat-interviews); box-shadow: 0 0 6px var(--cat-interviews); }
+.dot-hackathons { background: var(--cat-hackathons); box-shadow: 0 0 6px var(--cat-hackathons); }
 
 /* Main Central Panel Styles */
 .workspace-main {
@@ -904,6 +912,10 @@ input:checked + .slider:before {
 .day-task-block.cat-palana { background: var(--cat-palana); color: #fff; }
 .day-task-block.cat-github { background: var(--cat-github); }
 .day-task-block.cat-projects { background: var(--cat-projects); }
+.day-task-block.cat-awscp { background: var(--cat-awscp); }
+.day-task-block.cat-jobapps { background: var(--cat-jobapps); }
+.day-task-block.cat-interviews { background: var(--cat-interviews); }
+.day-task-block.cat-hackathons { background: var(--cat-hackathons); color: #fff; }
 
 /* Warning icon inside cell if overflow */
 .cell-warning-icon {
@@ -979,6 +991,7 @@ input:checked + .slider:before {
 .track-item-row.comp-aws { border-left-color: var(--cat-aws); }
 .track-item-row.comp-secplus { border-left-color: var(--cat-secplus); }
 .track-item-row.comp-projects { border-left-color: var(--cat-projects); }
+.track-item-row.comp-awscp { border-left-color: var(--cat-awscp); }
 
 .track-item-row.task-checked {
   opacity: 0.5;
@@ -2588,3 +2601,214 @@ input:checked + .slider:before {
   .task-actions-row { gap: 0.15rem; }
 }
 
+
+
+/* ========================================================================
+   FALL 2026 PLAN EXTENSION — milestones, sub-checklists, heavy days,
+   dated TRACK_4 project cards. Additive only; nothing above is overridden.
+   ======================================================================== */
+
+/* --- Milestones / deadlines ------------------------------------------- */
+.drawer-task-item.task-milestone {
+  border-left: 3px solid var(--neon-yellow, #ffea79);
+  background: rgba(255, 234, 121, 0.06);
+}
+.task-milestone-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--neon-yellow, #ffea79);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  color: var(--neon-yellow, #ffea79);
+  vertical-align: middle;
+}
+.day-task-block.block-milestone {
+  outline: 1px solid rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+}
+.milestone-badge {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--neon-yellow, #ffea79);
+  border-radius: 3px;
+  font-size: 0.6rem;
+  color: var(--neon-yellow, #ffea79);
+  font-family: var(--font-mono);
+}
+
+/* --- Task sub-checklists ---------------------------------------------- */
+.task-subtasks {
+  margin: 0.4rem 0 0.2rem 0;
+  padding: 0.35rem 0.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+.task-subtasks-head {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+.task-subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.12rem 0;
+  cursor: pointer;
+  position: relative;
+}
+.task-subtask-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+/* The shared .custom-checkbox is absolutely positioned for the big rows;
+   sub-items sit inline in a flex row instead. */
+.custom-checkbox-sm {
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.custom-checkbox-sm:after { font-size: 8px; left: 1px; top: 0; }
+.task-subtask-row:hover .custom-checkbox-sm { border-color: var(--neon-pink); }
+.task-subtask-row input:checked ~ .custom-checkbox-sm:after { display: block; }
+.task-subtask-label { font-size: 0.7rem; color: var(--text-secondary, #b9b9c9); }
+.task-subtask-row.subtask-checked .task-subtask-label {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.subtask-count {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  padding: 0.05rem 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+/* --- Heavy days (two commitments colliding) ---------------------------- */
+.day-cell.heavy-day-cell {
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 107, 0.7);
+}
+.cell-heavy-icon {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+.drawer-day-note.drawer-day-note-heavy {
+  border-color: rgba(255, 107, 107, 0.6);
+  background: rgba(255, 107, 107, 0.1);
+  color: #ffb3b3;
+}
+
+/* --- EXAM_STATUSES date lines ------------------------------------------ */
+.cert-name { display: flex; flex-direction: column; line-height: 1.25; }
+.cert-date {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* --- Track heading chips ----------------------------------------------- */
+.track-complete-chip,
+.track-range-chip {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.track-complete-chip {
+  border: 1px solid var(--neon-green, #87f0b5);
+  color: var(--neon-green, #87f0b5);
+}
+.track-range-chip {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-muted);
+}
+
+/* --- Dated TRACK_4 project cards --------------------------------------- */
+.dated-projects-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+.dated-project-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+.dated-project-card.project-done { border-color: rgba(135, 240, 181, 0.45); }
+.dated-project-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.dated-project-head:hover { background: rgba(255, 255, 255, 0.05); }
+.dated-project-caret { font-size: 0.7rem; color: var(--text-muted); width: 0.8rem; }
+.dated-project-name { flex: 1; font-size: 0.78rem; font-weight: 600; }
+.dated-project-due {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.dated-project-due.due-overdue { color: #ff8b8b; }
+.dated-project-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.6rem 0.5rem 1.8rem;
+}
+.dated-project-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.dated-project-fill {
+  height: 100%;
+  background: var(--cat-projects, #e2bbfd);
+  transition: width 0.3s ease;
+}
+.dated-project-pct {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.dated-project-body { padding: 0 0.6rem 0.6rem 1.8rem; }
+.dated-project-desc { font-size: 0.68rem; color: var(--text-muted); margin: 0 0 0.4rem 0; line-height: 1.4; }
+.dated-project-subtasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.18rem; }
+.dated-project-subtasks li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  color: var(--text-secondary, #b9b9c9);
+}
+.sub-bullet { color: var(--text-muted); }
+.sub-hours { margin-left: auto; font-family: var(--font-mono); font-size: 0.58rem; color: var(--text-muted); }
+.project-list-divider {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 0.4rem 0 0.3rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

@@ -106,7 +106,7 @@
           <span class="metric-icon">⏰</span>
         </div>
         <div class="metric-value" id="metric-countdown">--</div>
-        <div class="metric-footer">Target: Sept 1, 2026</div>
+        <div class="metric-footer">Target: Dec 31, 2026</div>
       </div>
 
       <!-- Card: Daily Streak -->
@@ -140,12 +140,16 @@
         </div>
         <div class="cert-status-list">
           <div class="cert-item">
-            <span class="cert-name">AWS AI Prac</span>
+            <span class="cert-name">AWS AI Prac<span class="cert-date">Completed</span></span>
             <span class="cert-badge status-todo" id="badge-aws">NOT STARTED</span>
           </div>
           <div class="cert-item">
-            <span class="cert-name">CompTIA Security+</span>
+            <span class="cert-name">CompTIA Security+<span class="cert-date">Scheduled Sep 18, 2026</span></span>
             <span class="cert-badge status-todo" id="badge-secplus">NOT STARTED</span>
+          </div>
+          <div class="cert-item">
+            <span class="cert-name">AWS Cloud Prac<span class="cert-date">Scheduled Sep 30, 2026</span></span>
+            <span class="cert-badge status-todo" id="badge-awscp">NOT STARTED</span>
           </div>
         </div>
       </div>
@@ -191,9 +195,9 @@
         <!-- Project Switcher & Personal Project Tracker -->
         <div class="panel-card glass-panel" id="project-selector-card">
           <div class="panel-header">
-            <h3>[TRACK_4] cybersecurity_projects</h3>
+            <h3>[TRACK_4] cybersecurity_projects <span class="track-range-chip">Aug 22 &ndash; Oct 4</span></h3>
           </div>
-          <p class="panel-description">Scheduled after Security+ exam (~Aug 22). Select which projects to include in your plan (requires 3-4 hours/day each):</p>
+          <p class="panel-description">Dated projects run through Oct 4. Expand one to see its sub-checklist; summer projects below stay selectable.</p>
           <div class="project-checklist" id="project-options-list">
             <!-- Dynamic project list loaded from JS -->
           </div>
@@ -248,6 +252,10 @@
             <div class="legend-item"><span class="legend-dot dot-winfo"></span> WINFO</div>
             <div class="legend-item"><span class="legend-dot dot-mentor"></span> Mentor Meetings</div>
             <div class="legend-item"><span class="legend-dot dot-projects"></span> Cyber Projects</div>
+            <div class="legend-item"><span class="legend-dot dot-awscp"></span> AWS Cloud Practitioner</div>
+            <div class="legend-item"><span class="legend-dot dot-jobapps"></span> Job Applications</div>
+            <div class="legend-item"><span class="legend-dot dot-interviews"></span> Interviews</div>
+            <div class="legend-item"><span class="legend-dot dot-hackathons"></span> Hackathons</div>
           </div>
           <button id="open-category-manager-btn" class="category-manager-btn" onclick="openCategoryManager()">+ Manage Categories</button>
         </div>
@@ -285,7 +293,7 @@
           <div class="tracks-container">
             <!-- Track 1 checklist card -->
             <div class="track-list-card">
-              <h4>TRACK 1: PortSwigger Web Academy (June 13 - June 27)</h4>
+              <h4>TRACK 1: PortSwigger Web Academy <span class="track-complete-chip">COMPLETE</span></h4>
               <p>Suggested Progression: Server-Side Topics (SQLi, Auth, Path Traversal, Command Injection) &rarr; Client-Side &rarr; Advanced Topics.</p>
               <div class="track-substats" id="substats-portswigger">0 / 0 Completed</div>
               <div class="track-items-list" id="list-portswigger-tasks"></div>
@@ -301,7 +309,7 @@
 
             <!-- Track 3 checklist card -->
             <div class="track-list-card">
-              <h4>TRACK 3: CompTIA Security+ SY0-701 (Exam Target Aug 18-22)</h4>
+              <h4>TRACK 3: CompTIA Security+ SY0-701 (Exam scheduled Fri Sept 18, 2026)</h4>
               <p>Video Lectures (Professor Messer 121 Videos) &rarr; Dion Practice Tests &rarr; Study Guides.</p>
               <div class="track-substats" id="substats-secplus">0 / 0 Completed</div>
               <div class="track-items-list" id="list-secplus-tasks"></div>
@@ -309,7 +317,7 @@
 
             <!-- Track 4 checklist card -->
             <div class="track-list-card">
-              <h4>TRACK 4: Cybersecurity Personal Projects (Aug 22 - Sep 1)</h4>
+              <h4>TRACK 4: Cybersecurity Personal Projects (Aug 22 - Oct 4)</h4>
               <p>Practical implementation, source control, documentation.</p>
               <div class="track-substats" id="substats-projects">0 / 0 Completed</div>
               <div class="track-items-list" id="list-projects-tasks"></div>
@@ -402,6 +410,12 @@
               <option value="ahf">ahf</option>
               <option value="palana">palana</option>
               <option value="github">github</option>
+              <option value="winfo">winfo</option>
+              <option value="mentor">mentor</option>
+              <option value="awscp">awscp</option>
+              <option value="jobapps">jobapps</option>
+              <option value="interviews">interviews</option>
+              <option value="hackathons">hackathons</option>
             </select>
             <input
               type="number"
@@ -493,7 +507,11 @@
             <option value="palana">Palana Prep</option>
             <option value="leetcode">LeetCode</option>
             <option value="secplus">Security+</option>
-            <option value="aws">AWS</option>
+            <option value="aws">AWS AI Practitioner</option>
+            <option value="awscp">AWS Cloud Practitioner</option>
+            <option value="jobapps">Job Applications</option>
+            <option value="interviews">Interviews</option>
+            <option value="hackathons">Hackathons</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -651,6 +669,11 @@
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-palana" checked><span class="custom-checkbox"></span>Palana tasks</label>
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-leetcode" checked><span class="custom-checkbox"></span>LeetCode tasks</label>
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-optional" checked><span class="custom-checkbox"></span>Optional tasks</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-awscp" checked><span class="custom-checkbox"></span>AWS Cloud Practitioner</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-jobapps" checked><span class="custom-checkbox"></span>Job applications</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-interviews" checked><span class="custom-checkbox"></span>Interviews</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-hackathons" checked><span class="custom-checkbox"></span>Hackathons</label>
+            <label class="checkbox-container export-check"><input type="checkbox" id="opt-portswigger"><span class="custom-checkbox"></span>PortSwigger (retired track)</label>
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-skipped" checked><span class="custom-checkbox"></span>Skipped tasks</label>
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-resources" checked><span class="custom-checkbox"></span>Resource links</label>
             <label class="checkbox-container export-check"><input type="checkbox" id="opt-notes" checked><span class="custom-checkbox"></span>Reflections &amp; notes</label>
@@ -712,6 +735,7 @@
   <script src="git-roadmap.js?v=20260616"></script>
   <script src="firebase-config.js?v=20260616"></script>
   <script src="app.js?v=20260616"></script>
+  <script src="plan-extension-2026.js?v=20260915"></script>
   <script src="export.js?v=20260616"></script>
   <script src="firebase-sync.js?v=20260616"></script>
 </body>

@@ -415,7 +415,10 @@ let appState = {
 
 // Date constants
 const START_DATE_STR = "2026-06-13";
-const END_DATE_STR = "2026-09-02";
+const END_DATE_STR = "2026-12-31"; // plan now runs through the end of 2026
+// The original summer generator (June 13 - Sep 2) still builds only its own
+// window; everything after it is added additively by plan-extension-2026.js.
+const BASE_SCHEDULE_END = "2026-09-02";
 const INDIA_START_STR = "2026-06-24";
 const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
@@ -860,7 +863,7 @@ function getBaseCapacityForDay(dateStr, maxNormal) {
 function generateBaseSchedule() {
   const daysList = [];
   const start = parseDate(START_DATE_STR);
-  const end = parseDate(END_DATE_STR);
+  const end = parseDate(BASE_SCHEDULE_END);
   
   let current = new Date(start);
   while (current <= end) {
@@ -1116,7 +1119,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
     let scheduledHours = day.tasks.reduce((sum, t) => sum + t.duration, 0);
 
     // Allow slight capacity stretch in August to fit all curriculum before Sep 1
-    const effectiveCap = (day.date >= SECPLUS_START_DATE && day.date <= END_DATE_STR)
+    const effectiveCap = (day.date >= SECPLUS_START_DATE && day.date <= BASE_SCHEDULE_END)
       ? day.maxCapacity + 1.0 : day.maxCapacity;
 
     // Distribute tasks on this day up to its maxCapacity
@@ -1200,7 +1203,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
   // If there are still tasks left in the backlog after September 1st, 
   // we create EXTRA days in the schedule to hold them, which flags the At-Risk state.
   if (backlogIndex < backlog.length) {
-    let overflowDate = parseDate(END_DATE_STR);
+    let overflowDate = parseDate(BASE_SCHEDULE_END);
     
     while (backlogIndex < backlog.length) {
       overflowDate.setDate(overflowDate.getDate() + 1);
@@ -1481,7 +1484,7 @@ function reflowRemainingCurriculum() {
   for (let i = 0; i < startReflowIndex; i++) {
     const d = appState.days[i];
     d.tasks.forEach(t => {
-      if (t.category === "leetcode" && !t.title.includes("Rolled Over") && !t.microsoftOA) {
+      if (t.category === "leetcode" && !t.title.includes("Rolled Over") && !t.microsoftOA && !t.backfilled) {
         lcIndex++;
       }
     });
@@ -1537,8 +1540,8 @@ function reflowRemainingCurriculum() {
     // LeetCode — Microsoft OA prep override (Aug 11-17) uses a fixed 6-problem set;
     // otherwise, 2 Blind 75 problems per day from LEETCODE_START_2PERDAY onward.
     const existingLc = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over"));
-    // Only completed Blind 75 tasks advance the sequential index — MS OA tasks don't.
-    lcIndex += existingLc.filter(t => !t.microsoftOA).length;
+    // Only completed Blind 75 tasks advance the sequential index — MS OA + backfilled tasks don't.
+    lcIndex += existingLc.filter(t => !t.microsoftOA && !t.backfilled).length;
     const msOaSet = (typeof MICROSOFT_OA_OVERRIDE !== "undefined") ? MICROSOFT_OA_OVERRIDE[day.date] : null;
     if (msOaSet) {
       const existingIds = new Set(existingLc.map(t => t.leetcodeId));
@@ -1978,14 +1981,16 @@ function renderTodaySection() {
   if (!day) { container.innerHTML = "<p>No tasks for today.</p>"; return; }
 
   const formatted = parseDate(today).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  const total = day.tasks.reduce((s, t) => s + t.duration, 0);
-  const done = day.tasks.filter(t => t.completed).length;
-  const pending = day.tasks.filter(t => !t.completed);
+  // Retired tracks (PortSwigger) are excluded from the daily checklist.
+  const todayTasks = day.tasks.filter(t => (typeof isSurfacedTask === "function") ? isSurfacedTask(t) : true);
+  const total = todayTasks.reduce((s, t) => s + t.duration, 0);
+  const done = todayTasks.filter(t => t.completed).length;
+  const pending = todayTasks.filter(t => !t.completed);
 
   container.innerHTML = `
     <div class="today-section-header">
       <h3>📅 TODAY — ${formatted}</h3>
-      <span class="today-stats">${done}/${day.tasks.length} done · ${total.toFixed(1)}h scheduled · ${day.maxCapacity}h capacity</span>
+      <span class="today-stats">${done}/${todayTasks.length} done · ${total.toFixed(1)}h scheduled · ${day.maxCapacity}h capacity</span>
     </div>
     <div class="today-task-list">
       ${pending.length === 0 ? '<p class="today-all-done">All tasks complete for today! 🎉</p>' :
@@ -1996,6 +2001,8 @@ function renderTodaySection() {
             <span class="today-task-title">${t.title}</span>
             <span class="today-task-dur">${t.duration}h</span>
             ${taskHasNotes(t.id) ? '<span class="notes-dot">📝</span>' : ''}
+            ${t.milestone ? '<span class="milestone-badge">◆ Milestone</span>' : ''}
+            ${Array.isArray(t.subtasks) && t.subtasks.length ? `<span class="subtask-count">${t.subtasks.filter(st => st.completed).length}/${t.subtasks.length}</span>` : ''}
             ${t.fixed ? '<span class="fixed-badge">Fixed</span>' : ''}
           </div>`;
         }).join("")}
@@ -2126,6 +2133,143 @@ function addNewExtracurricular() {
 
   modal.classList.add("open");
 }
+
+// One-time backfill: fills in June 13 – July 31 with 2 LC/day + an AHF entry
+// per day, then marks every task in that window completed. Never touches Aug/Sep.
+// Guarded by settings.backfillJuneJulyV1Done — call backfillJuneJulyCompleted(true)
+// from the console to force-rerun.
+const BACKFILL_START = "2026-06-13";
+const BACKFILL_END = "2026-07-31";
+
+function backfillJuneJulyCompleted(force) {
+  appState.settings = appState.settings || {};
+  if (!force && appState.settings.backfillJuneJulyV2Done) return;
+  if (!Array.isArray(appState.days) || appState.days.length === 0) return;
+  if (typeof BLIND_75_QUESTIONS === "undefined") return;
+
+  const nowIso = new Date().toISOString();
+  const window = appState.days.filter(d => d.date >= BACKFILL_START && d.date <= BACKFILL_END);
+  if (window.length === 0) return;
+
+  // Snapshot Aug 1+ completion state so nothing outside Jun/Jul can drift.
+  const preservedAfter = {};
+  appState.days.forEach(d => {
+    if (d.date < "2026-08-01") return;
+    d.tasks.forEach(t => {
+      preservedAfter[t.id] = {
+        completed: !!t.completed,
+        completedOnDate: t.completedOnDate || null,
+        completedAt: t.completedAt || null,
+        status: t.status || null,
+        completedMinutes: t.completedMinutes || null,
+        remainingMinutes: t.remainingMinutes || null
+      };
+    });
+  });
+  const preservedSettings = {
+    awsExamPassed: !!appState.settings.awsExamPassed,
+    securityPlusExamPassed: !!appState.settings.securityPlusExamPassed
+  };
+
+  // 1. Ensure every day has an AHF entry
+  window.forEach(day => {
+    if (!day.tasks.some(t => t.category === "ahf")) {
+      day.tasks.push({
+        id: `${day.date}_ahf_backfill`,
+        category: "ahf",
+        title: "AHF Work (Tech Lead Duties)",
+        duration: 1.0,
+        completed: false,
+        link: null,
+        backfilled: true
+      });
+    }
+  });
+
+  // 2. Ensure exactly 2 LC per day (cycle Blind 75 if we run past 75 slots).
+  //    backfilled:true so the sequential Blind 75 index isn't disturbed for Aug/Sep.
+  let lcCursor = 0;
+  window.forEach(day => {
+    const existing = day.tasks.filter(t => t.category === "leetcode").length;
+    const needed = Math.max(0, 2 - existing);
+    for (let k = 0; k < needed; k++) {
+      const problem = BLIND_75_QUESTIONS[lcCursor % BLIND_75_QUESTIONS.length];
+      lcCursor++;
+      day.tasks.push({
+        id: `${day.date}_leetcode_backfill_${k + 1}`,
+        category: "leetcode",
+        title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
+        duration: 0.5,
+        completed: false,
+        link: problem.link,
+        leetcodeId: problem.id,
+        backfilled: true
+      });
+    }
+  });
+
+  // 3. Mark every task in the window as completed — but skip exam tasks so cert
+  //    badges (AWS / Sec+) stay untouched.
+  const isExamTask = (t) => /Certification Exam/i.test(t.title || "");
+  window.forEach(day => {
+    day.tasks.forEach(t => {
+      if (t.completed || isExamTask(t)) return;
+      t.completed = true;
+      t.completedOnDate = day.date;
+      t.completedAt = nowIso;
+      t.status = "done";
+      const dur = t.duration || 0;
+      t.completedMinutes = Math.round(dur * 60);
+      t.remainingMinutes = 0;
+    });
+  });
+
+  // 4. Restore Aug 1+ completion state exactly as it was before this ran.
+  appState.days.forEach(d => {
+    if (d.date < "2026-08-01") return;
+    d.tasks.forEach(t => {
+      const snap = preservedAfter[t.id];
+      if (!snap) return;
+      t.completed = snap.completed;
+      if (snap.completedOnDate) t.completedOnDate = snap.completedOnDate; else delete t.completedOnDate;
+      if (snap.completedAt) t.completedAt = snap.completedAt; else delete t.completedAt;
+      if (snap.status) t.status = snap.status; else delete t.status;
+      if (snap.completedMinutes != null) t.completedMinutes = snap.completedMinutes; else delete t.completedMinutes;
+      if (snap.remainingMinutes != null) t.remainingMinutes = snap.remainingMinutes; else delete t.remainingMinutes;
+    });
+  });
+  appState.settings.awsExamPassed = preservedSettings.awsExamPassed;
+  appState.settings.securityPlusExamPassed = preservedSettings.securityPlusExamPassed;
+
+  appState.settings.backfillJuneJulyV2Done = true;
+  saveState();
+}
+
+// One-shot cleanup: undo any auto-completion the earlier backfill made on the
+// AWS/Sec+ certification exam tasks (safe to run repeatedly — only touches
+// exam tasks that got auto-completed by the backfill).
+function unmarkExamTasksIfBackfilled() {
+  let changed = 0;
+  appState.days.forEach(d => {
+    // Only the Jun/Jul backfill window — later months own their own state.
+    if (d.date < BACKFILL_START || d.date > BACKFILL_END) return;
+    d.tasks.forEach(t => {
+      if (t.completed && /Certification Exam/i.test(t.title || "")) {
+        t.completed = false;
+        delete t.completedOnDate;
+        delete t.completedAt;
+        delete t.status;
+        delete t.completedMinutes;
+        delete t.remainingMinutes;
+        changed++;
+      }
+    });
+  });
+  if (changed) saveState();
+  return changed;
+}
+window.unmarkExamTasksIfBackfilled = unmarkExamTasksIfBackfilled;
+window.backfillJuneJulyCompleted = backfillJuneJulyCompleted;
 
 let _saveTimer = null;
 function saveState() {
@@ -2361,7 +2505,7 @@ function renderDashboardMetrics() {
   // Count total tasks
   let totalTasks = 0;
   let completedTasks = 0;
-  let leetCodeDone = 0;
+  const leetCodeSolvedIds = new Set();
   let totalLeetCode = 75; // Blind 75
   
   let portswiggerDone = 0;
@@ -2369,19 +2513,26 @@ function renderDashboardMetrics() {
   
   let secPlusHours = 0;
   
+  // PortSwigger (Track 1) is retired: its rows stay for history but are not
+  // counted as outstanding work. isSurfacedTask() lives in plan-extension-2026.js.
+  const surfaced = (t) => (typeof isSurfacedTask === "function") ? isSurfacedTask(t) : true;
+
   appState.days.forEach(day => {
     day.tasks.forEach(t => {
-      totalTasks++;
-      if (t.completed) completedTasks++;
+      if (surfaced(t)) {
+        totalTasks++;
+        if (t.completed) completedTasks++;
+      }
       
       // Portswigger specific
       if (t.category === "portswigger" && t.completed) {
         portswiggerDone++;
       }
       
-      // Leetcode specific
-      if (t.category === "leetcode" && t.completed) {
-        leetCodeDone++;
+      // Leetcode specific — distinct Blind 75 problem ids only, so repeat
+      // practice of the same problem doesn't push the counter past 75.
+      if (t.category === "leetcode" && t.completed && t.leetcodeId) {
+        leetCodeSolvedIds.add(t.leetcodeId);
       }
       
       // Sec+ study logged hours
@@ -2408,9 +2559,10 @@ function renderDashboardMetrics() {
     // Only count days up to and including real today (NOT simulated today)
     if (day.date > realTodayStr) break;
     // Check if day has tasks
-    if (day.tasks.length > 0) {
-      const allDone = day.tasks.every(t => t.completed);
-      const anyDone = day.tasks.some(t => t.completed);
+    const streakTasks = day.tasks.filter(surfaced);
+    if (streakTasks.length > 0) {
+      const allDone = streakTasks.every(t => t.completed);
+      const anyDone = streakTasks.some(t => t.completed);
       
       if (allDone && anyDone) {
         currentStreak++;
@@ -2442,6 +2594,7 @@ function renderDashboardMetrics() {
   document.getElementById("metric-longest-streak").innerText = `Longest: ${longestStreak} days`;
   
   // LeetCode progress
+  const leetCodeDone = Math.min(totalLeetCode, leetCodeSolvedIds.size);
   document.getElementById("metric-leetcode").innerText = `${leetCodeDone} / ${totalLeetCode}`;
   const lcPercent = Math.min(100, Math.round((leetCodeDone / totalLeetCode) * 100));
   document.getElementById("metric-leetcode-fill").style.width = `${lcPercent}%`;
@@ -2494,6 +2647,23 @@ function renderDashboardMetrics() {
     }
   }
 
+  // AWS Cloud Practitioner badge (separate cert from the AI Practitioner one)
+  const awsCpBadge = document.getElementById("badge-awscp");
+  if (awsCpBadge) {
+    const cpExamDone = appState.days.some(d => d.tasks.some(t => t.category === "awscp" && /Certification Exam/i.test(t.title || "") && t.completed));
+    const someCpDone = appState.days.some(d => d.tasks.some(t => t.category === "awscp" && t.completed));
+    if (cpExamDone) {
+      awsCpBadge.innerText = "PASSED ✅";
+      awsCpBadge.className = "cert-badge status-passed";
+    } else if (someCpDone) {
+      awsCpBadge.innerText = "IN PROGRESS";
+      awsCpBadge.className = "cert-badge status-progress";
+    } else {
+      awsCpBadge.innerText = "NOT STARTED";
+      awsCpBadge.className = "cert-badge status-todo";
+    }
+  }
+
   // Bind settings modal checkboxes to state
   document.getElementById("settings-aws-passed").checked = appState.settings.awsExamPassed;
   document.getElementById("settings-secplus-passed").checked = appState.settings.securityPlusExamPassed;
@@ -2501,12 +2671,69 @@ function renderDashboardMetrics() {
   document.getElementById("settings-palana-toggle").checked = appState.settings.palanaEnabled;
 }
 
-// Sidebar project checkboxes
+// Sidebar project checkboxes.
+// Dated projects (added by plan-extension-2026.js) render as collapsible cards
+// with a target date, a progress bar and a sub-task list. The original summer
+// projects keep their plain checkbox row and their completion state.
 function renderProjectSelector() {
   const container = document.getElementById("project-options-list");
   container.innerHTML = "";
-  
-  TRACK_4_PROJECTS.forEach(proj => {
+
+  const datedProjects = TRACK_4_PROJECTS.filter(p => p.dated);
+  const legacyProjects = TRACK_4_PROJECTS.filter(p => !p.dated);
+
+  if (datedProjects.length) {
+    const datedWrap = document.createElement("div");
+    datedWrap.className = "dated-projects-list";
+
+    datedProjects.forEach(proj => {
+      const prog = (typeof datedProjectProgress === "function")
+        ? datedProjectProgress(proj.id)
+        : { done: 0, total: 0, pct: 0 };
+      const dueLabel = proj.dueDate
+        ? parseDate(proj.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+        : "—";
+      const isOverdue = proj.dueDate && proj.dueDate < getRealCurrentDate() && prog.pct < 100;
+      const isOpen = !!(appState.settings.openProjectCards || {})[proj.id];
+
+      const card = document.createElement("div");
+      card.className = `dated-project-card ${isOpen ? 'open' : ''} ${prog.pct === 100 ? 'project-done' : ''}`;
+      card.innerHTML = `
+        <button class="dated-project-head" type="button">
+          <span class="dated-project-caret">${isOpen ? '▾' : '▸'}</span>
+          <span class="dated-project-name">${proj.name}</span>
+          <span class="dated-project-due ${isOverdue ? 'due-overdue' : ''}">Due ${dueLabel}</span>
+        </button>
+        <div class="dated-project-progress">
+          <div class="dated-project-bar"><div class="dated-project-fill" style="width:${prog.pct}%"></div></div>
+          <span class="dated-project-pct">${prog.done}/${prog.total} · ${prog.pct}%</span>
+        </div>
+        <div class="dated-project-body" ${isOpen ? '' : 'hidden'}>
+          <p class="dated-project-desc">${proj.desc}</p>
+          <ul class="dated-project-subtasks">
+            ${proj.tasks.map(t => `<li><span class="sub-bullet">▫</span>${t.name}<span class="sub-hours">${t.duration}h</span></li>`).join("")}
+          </ul>
+        </div>
+      `;
+      card.querySelector(".dated-project-head").addEventListener("click", () => {
+        playSynthSound("click");
+        appState.settings.openProjectCards = appState.settings.openProjectCards || {};
+        appState.settings.openProjectCards[proj.id] = !isOpen;
+        saveState();
+        renderProjectSelector();
+      });
+      datedWrap.appendChild(card);
+    });
+
+    container.appendChild(datedWrap);
+
+    const divider = document.createElement("div");
+    divider.className = "project-list-divider";
+    divider.innerText = "SUMMER 2026 PROJECTS";
+    container.appendChild(divider);
+  }
+
+  legacyProjects.forEach(proj => {
     const isSelected = appState.settings.selectedProjects.includes(proj.id);
     
     const label = document.createElement("label");
@@ -2543,7 +2770,10 @@ function renderCalendarMonthControls() {
     { code: "2026-06", label: "JUNE 2026" },
     { code: "2026-07", label: "JULY 2026" },
     { code: "2026-08", label: "AUGUST 2026" },
-    { code: "2026-09", label: "SEPT 2026" }
+    { code: "2026-09", label: "SEPT 2026" },
+    { code: "2026-10", label: "OCT 2026" },
+    { code: "2026-11", label: "NOV 2026" },
+    { code: "2026-12", label: "DEC 2026" }
   ];
   
   months.forEach(m => {
@@ -2592,8 +2822,16 @@ function renderCalendarDays() {
     if (isPlanFuture(day.date)) dayCell.classList.add("future-day");
     if (day.isIndia) dayCell.classList.add("travel-day");
     
+    if (typeof heavyDayReason === "function" && heavyDayReason(day.date)) {
+      dayCell.classList.add("heavy-day-cell");
+      dayCell.title = `HEAVY DAY — ${heavyDayReason(day.date)}`;
+    }
+
+    // Retired tracks stay in the data but stop rendering on the calendar.
+    const cellTasks = day.tasks.filter(t => (typeof isSurfacedTask === "function") ? isSurfacedTask(t) : true);
+
     // Color load meter
-    const totalScheduled = day.tasks.reduce((sum, t) => sum + t.duration, 0);
+    const totalScheduled = cellTasks.reduce((sum, t) => sum + t.duration, 0);
     const capacityRatio = day.maxCapacity > 0 ? (totalScheduled / day.maxCapacity) : 0;
     
     let loadClass = "load-optimal";
@@ -2606,7 +2844,7 @@ function renderCalendarDays() {
     // Check if there are uncompleted tasks in the past
     // E.g. warning icon on cell
     const isPast = isPlanPast(day.date);
-    const hasUnfinishedPast = isPast && day.tasks.some(t => !t.completed && !t.fixed);
+    const hasUnfinishedPast = isPast && cellTasks.some(t => !t.completed && !t.fixed);
     
     const warningIconHtml = hasUnfinishedPast ? 
       `<span class="cell-warning-icon" title="Uncompleted tasks! Click rollover.">⚠️</span>` : '';
@@ -2626,16 +2864,17 @@ function renderCalendarDays() {
         <!-- Dynamically filled with task tokens -->
       </div>
       ${warningIconHtml}
+      ${(typeof heavyDayReason === "function" && heavyDayReason(day.date)) ? '<span class="cell-heavy-icon" title="Heavy day — two commitments collide">🔥</span>' : ''}
     `;
     
     // Add colored task blocks
     const dotsContainer = dayCell.querySelector(".day-tasks-dots");
     // Sort tasks so completed ones are pushed to bottom
-    const sortedTasks = [...day.tasks].sort((a,b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
+    const sortedTasks = [...cellTasks].sort((a,b) => (a.completed ? 1 : 0) - (b.completed ? 1 : 0));
 
     sortedTasks.forEach(task => {
       const block = document.createElement("div");
-      block.className = `day-task-block cat-${task.category} ${task.completed ? 'task-completed' : ''}`;
+      block.className = `day-task-block cat-${task.category} ${task.completed ? 'task-completed' : ''} ${task.milestone ? 'block-milestone' : ''}`;
       block.innerText = task.title;
       dotsContainer.appendChild(block);
     });
@@ -2714,11 +2953,16 @@ function showDayDetails(dateStr) {
     statusEl.className = "cap-val status-indicator status-optimal";
   }
 
-  // India Trip warning banner
+  // India Trip warning banner / heavy-day collision flag
   const noteEl = document.getElementById("drawer-day-note");
+  const heavyReason = (typeof heavyDayReason === "function") ? heavyDayReason(dateStr) : null;
   if (day.isIndia) {
     noteEl.innerText = "INDIA TRIP: Workload capped to 2-3 hours max. Light tasks only.";
     noteEl.className = "drawer-day-note";
+    noteEl.classList.remove("hidden");
+  } else if (heavyReason) {
+    noteEl.innerText = `HEAVY DAY: ${heavyReason}. Two commitments land together — plan around it.`;
+    noteEl.className = "drawer-day-note drawer-day-note-heavy";
     noteEl.classList.remove("hidden");
   } else {
     noteEl.classList.add("hidden");
@@ -2728,12 +2972,15 @@ function showDayDetails(dateStr) {
   const listContainer = document.getElementById("drawer-tasks-list");
   listContainer.innerHTML = "";
   
-  if (day.tasks.length === 0) {
+  // Retired tracks (PortSwigger) keep their history but stop appearing here.
+  const visibleTasks = day.tasks.filter(t => (typeof isSurfacedTask === "function") ? isSurfacedTask(t) : true);
+
+  if (visibleTasks.length === 0) {
     listContainer.innerHTML = `<div class="empty-state-text" style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:1rem;">No tasks scheduled. Relax! 🛰️</div>`;
   } else {
-    day.tasks.forEach(task => {
+    visibleTasks.forEach(task => {
       const itemRow = document.createElement("div");
-      itemRow.className = `drawer-task-item ${task.completed ? 'task-checked' : ''}`;
+      itemRow.className = `drawer-task-item ${task.completed ? 'task-checked' : ''} ${task.milestone ? 'task-milestone' : ''}`;
       itemRow.draggable = true;
       itemRow.title = "Drag to a calendar day to move this task";
       itemRow.addEventListener('dragstart', (e) => {
@@ -2759,6 +3006,19 @@ function showDayDetails(dateStr) {
       const notesIndicator = hasNotes ? `<span class="task-notes-indicator" title="Has notes">📝</span>` : '';
       const notesBtn = `<button class="task-notes-btn" title="Edit notes">📝</button>`;
       const statusBadge = task.status && task.status !== "done" ? `<span class="task-status-badge status-${task.status}">${task.status}</span>` : '';
+      const milestoneBadge = task.milestone ? `<span class="task-milestone-badge" title="Deadline / milestone">◆ MILESTONE</span>` : '';
+      const subs = Array.isArray(task.subtasks) ? task.subtasks : [];
+      const subDone = subs.filter(st => st.completed).length;
+      const subtasksHtml = subs.length ? `
+        <div class="task-subtasks">
+          <div class="task-subtasks-head">${subDone} / ${subs.length} done</div>
+          ${subs.map((st, si) => `
+            <label class="task-subtask-row ${st.completed ? 'subtask-checked' : ''}">
+              <input type="checkbox" class="task-subtask-cb" data-sub-index="${si}" ${st.completed ? 'checked' : ''}>
+              <span class="custom-checkbox custom-checkbox-sm"></span>
+              <span class="task-subtask-label">${st.title}</span>
+            </label>`).join("")}
+        </div>` : '';
       const ownerBadge = task.owner ? `<span class="owner-badge owner-${task.owner}">${task.owner === "shared" ? "Shared" : task.owner === "tejaswi" ? "Tejaswi" : "Thanishka"}</span>` : '';
       const actionsHtml = task.completed ? '' : `
         <div class="task-actions-row">
@@ -2774,11 +3034,12 @@ function showDayDetails(dateStr) {
           <span class="custom-checkbox"></span>
         </label>
         <div class="task-details">
-          <span class="task-label">${task.title}${notesIndicator}${statusBadge}${ownerBadge}</span>
+          <span class="task-label">${task.title}${milestoneBadge}${notesIndicator}${statusBadge}${ownerBadge}</span>
           <div class="task-sub-meta">
             <span class="task-cat-badge badge-${task.category}">${getCategoryLabel(task.category)}</span>
             <span>Est: ${task.duration} hr${task.duration > 1 ? 's' : ''}${task.completedMinutes ? ` · ${(task.completedMinutes/60).toFixed(1)}h done` : ''}</span>
           </div>
+          ${subtasksHtml}
           ${actionsHtml}
         </div>
         ${linkHtml}
@@ -2824,10 +3085,43 @@ function showDayDetails(dateStr) {
         });
       }
       
+      // Sub-checklist listeners. Ticking every sub-item completes the parent;
+      // ticking the parent ticks every sub-item.
+      itemRow.querySelectorAll(".task-subtask-cb").forEach(subCb => {
+        subCb.addEventListener("change", (e) => {
+          e.stopPropagation();
+          const si = parseInt(subCb.getAttribute("data-sub-index"), 10);
+          if (!task.subtasks || !task.subtasks[si]) return;
+          task.subtasks[si].completed = subCb.checked;
+          const allSubsDone = task.subtasks.every(st => st.completed);
+          if (allSubsDone && !task.completed) {
+            task.completed = true;
+            task.completedAt = new Date().toISOString();
+            task.completedOnDate = dateStr;
+            playSynthSound("success");
+            spawnSparkles(e);
+          } else if (!allSubsDone && task.completed) {
+            task.completed = false;
+            delete task.completedAt;
+            delete task.completedOnDate;
+            playSynthSound("click");
+          } else {
+            playSynthSound("click");
+          }
+          saveState();
+          renderDashboardMetrics();
+          renderCalendarDays();
+          showDayDetails(dateStr);
+        });
+      });
+
       // Checkbox listener
       const cb = itemRow.querySelector('input');
       cb.addEventListener('change', (e) => {
         task.completed = e.target.checked;
+        if (Array.isArray(task.subtasks)) {
+          task.subtasks.forEach(st => { st.completed = task.completed; });
+        }
         if (task.completed) {
           // Record completion metadata for accurate exports / reporting
           task.completedAt = new Date().toISOString();
@@ -2855,6 +3149,7 @@ function showDayDetails(dateStr) {
         } else {
           itemRow.classList.remove('task-checked');
         }
+        if (Array.isArray(task.subtasks) && task.subtasks.length) showDayDetails(dateStr);
       });
       
       listContainer.appendChild(itemRow);
@@ -3060,6 +3355,9 @@ function bootApp() {
   loadState();
   migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
   maybeAutoRepairRollover(); // one-time fix for old multi-day rollover damage
+  backfillJuneJulyCompleted(); // one-time: mark all Jun 13–Jul 31 work complete
+  unmarkExamTasksIfBackfilled(); // safety: never leave the AWS/Sec+ exam auto-marked
+  if (typeof extendPlanThroughDec2026 === "function") extendPlanThroughDec2026(); // Sept 3 - Dec 31 plan
   applyCategoryColors();     // sync edited category colors into CSS variables
   initUI();
   

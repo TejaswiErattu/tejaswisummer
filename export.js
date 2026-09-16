@@ -72,7 +72,9 @@
 
   // ── Category metadata ──────────────────────────────────────────────────────
   const CAT_LABEL = {
-    portswigger: "PortSwigger Labs", aws: "AWS Cloud Practitioner", secplus: "CompTIA Security+",
+    portswigger: "PortSwigger Labs", aws: "AWS AI Practitioner", secplus: "CompTIA Security+",
+    awscp: "AWS Cloud Practitioner", jobapps: "Job Applications",
+    interviews: "Interviews", hackathons: "Hackathons",
     projects: "Cybersecurity Projects", leetcode: "LeetCode Blind 75", ahf: "AHF Tech Lead",
     info310: "INFO 310 Class", palana: "Palana Preparation", palana_security: "Palana Security",
     github: "Git Developer Tool", winfo: "WINFO", mentor: "Mentor Meetings",
@@ -227,6 +229,12 @@
     if (c === "info310" && !opt.includeInfo310) return false;
     if (c === "leetcode" && !opt.includeLeetcode) return false;
     if ((c === "projects" || c === "github") && !opt.includeOptional) return false;
+    if (c === "awscp" && !opt.includeAwsCp) return false;
+    if (c === "jobapps" && !opt.includeJobApps) return false;
+    if (c === "interviews" && !opt.includeInterviews) return false;
+    if (c === "hackathons" && !opt.includeHackathons) return false;
+    // PortSwigger is a retired track: excluded unless explicitly requested.
+    if (c === "portswigger" && !opt.includePortswigger) return false;
     return true;
   }
 
@@ -540,7 +548,7 @@
       leetcode: byCat("leetcode"), info310: byCat("info310"), ahf: byCat("ahf"),
       palana: byCat("palana"), projects: byCat("projects"), github: byCat("github"),
       onTrack: !atRisk, atRisk,
-      categories: ["portswigger", "aws", "secplus", "leetcode", "info310", "ahf", "palana", "github", "projects"].map(c => ({
+      categories: ["portswigger", "aws", "awscp", "secplus", "leetcode", "info310", "ahf", "palana", "github", "projects", "jobapps", "interviews", "hackathons", "winfo", "mentor"].map(c => ({
         cat: CAT_LABEL[c], stats: byCat(c)
       })).filter(x => x.stats.plannedCount > 0)
     };
@@ -1388,6 +1396,11 @@
       includeInfo310: opt.includeInfo310 !== false,
       includeLeetcode: opt.includeLeetcode !== false,
       includeOptional: opt.includeOptional !== false,
+      includeAwsCp: opt.includeAwsCp !== false,
+      includeJobApps: opt.includeJobApps !== false,
+      includeInterviews: opt.includeInterviews !== false,
+      includeHackathons: opt.includeHackathons !== false,
+      includePortswigger: opt.includePortswigger === true,
       includeSkipped: opt.includeSkipped !== false,
       includeResources: opt.includeResources !== false,
       includeNotes: opt.includeNotes !== false
@@ -1428,6 +1441,9 @@
       rangeEnd: (document.getElementById("export-range-end") || {}).value || END,
       includeAHF: val("opt-ahf"), includePalana: val("opt-palana"), includeInfo310: val("opt-info310"),
       includeLeetcode: val("opt-leetcode"), includeOptional: val("opt-optional"), includeSkipped: val("opt-skipped"),
+      includeAwsCp: val("opt-awscp"), includeJobApps: val("opt-jobapps"),
+      includeInterviews: val("opt-interviews"), includeHackathons: val("opt-hackathons"),
+      includePortswigger: (document.getElementById("opt-portswigger") || {}).checked === true,
       includeResources: val("opt-resources"), includeNotes: val("opt-notes")
     };
   }
@@ -1520,7 +1536,8 @@
         if (typeof playSynthSound === "function") playSynthSound("click");
       });
     });
-    ["opt-ahf", "opt-palana", "opt-info310", "opt-leetcode", "opt-optional", "opt-skipped", "opt-resources", "opt-notes"]
+    ["opt-ahf", "opt-palana", "opt-info310", "opt-leetcode", "opt-optional", "opt-skipped", "opt-resources", "opt-notes",
+     "opt-awscp", "opt-jobapps", "opt-interviews", "opt-hackathons", "opt-portswigger"]
       .forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener("change", refreshPreview); });
     ["export-range-start", "export-range-end"].forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener("change", refreshPreview); });
   }
