@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260616">
+  <link rel="stylesheet" href="css/chatbot.css?v=20260916a">
 </head>
 <body class="hacker-theme">
   <!-- Scanline Overlay for CRT effect -->
@@ -738,5 +739,7 @@
   <script src="plan-extension-2026.js?v=20260915"></script>
   <script src="export.js?v=20260616"></script>
   <script src="firebase-sync.js?v=20260616"></script>
+  <!-- Assistant panel. Self-contained ES module; talks to the app only via js/chatbot/adapter.js -->
+  <script type="module" src="js/chatbot/index.js?v=20260916a"></script>
 </body>
 </html>
