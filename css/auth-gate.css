@@ -1,0 +1,128 @@
+/* Sign-in gate for the whole tracker.
+   The gate markup ships visible and <body> ships with .app-locked, so the app
+   never paints real progress before Firebase has confirmed who is signed in.
+   js/auth-gate.js is the only thing that lifts the lock. */
+
+#app-auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #0a0612;
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(255, 121, 198, 0.10), transparent 45%),
+    radial-gradient(circle at 80% 85%, rgba(139, 233, 253, 0.08), transparent 45%);
+  font-family: var(--font-mono);
+}
+
+#app-auth-gate[hidden] { display: none !important; }
+
+/* Hide every top-level chunk of the app while locked. Targeting direct children
+   keeps this working no matter how the page's sections are rearranged, and it
+   covers nodes appended at runtime (chatbot panel, toasts) for free. */
+body.app-locked > *:not(#app-auth-gate) { display: none !important; }
+body.app-locked { overflow: hidden; }
+
+.gate-card {
+  width: min(460px, 100%);
+  padding: 34px 30px;
+  text-align: center;
+  border: 1px solid var(--border-neon-pink);
+  border-radius: 14px;
+  background: rgba(18, 10, 30, 0.92);
+  box-shadow: var(--shadow-box), 0 0 42px rgba(255, 121, 198, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.gate-lock { font-size: 2.4rem; line-height: 1; margin-bottom: 14px; }
+
+.gate-title {
+  margin: 0 0 8px;
+  font-size: 1.04rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--neon-pink);
+  text-shadow: var(--glow-pink);
+}
+
+.gate-sub {
+  margin: 0 auto 22px;
+  max-width: 34ch;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* --- state machine: checking -> locked ---------------------------------- */
+#app-auth-gate [data-when] { display: none; }
+#app-auth-gate[data-state="checking"] [data-when="checking"] { display: block; }
+#app-auth-gate[data-state="locked"]   [data-when="locked"]   { display: block; }
+
+.gate-spinner {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto;
+  border: 2px solid rgba(255, 121, 198, 0.25);
+  border-top-color: var(--neon-pink);
+  border-radius: 50%;
+  animation: gate-spin 0.8s linear infinite;
+}
+
+@keyframes gate-spin { to { transform: rotate(360deg); } }
+
+.gate-checking-label {
+  margin-top: 12px;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.gate-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  color: #1c1c1c;
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gate-signin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.18);
+}
+
+.gate-error {
+  margin-top: 16px;
+  padding: 10px 12px;
+  font-size: 0.76rem;
+  line-height: 1.55;
+  text-align: left;
+  color: var(--neon-coral);
+  border: 1px solid var(--neon-coral);
+  border-radius: 8px;
+  background: rgba(255, 85, 85, 0.08);
+}
+
+.gate-error[hidden] { display: none !important; }
+
+.gate-foot {
+  margin-top: 20px;
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+@media (max-width: 480px) {
+  .gate-card { padding: 26px 20px; }
+  .gate-sub { font-size: 0.78rem; }
+}

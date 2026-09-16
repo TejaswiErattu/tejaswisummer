@@ -24,9 +24,16 @@ function signInWithGoogle() {
   });
 }
 
-function signOutFirebase() {
+async function signOutFirebase() {
+  // Push any debounced change up before the session ends. js/auth-gate.js wipes
+  // local progress right after sign-out, so anything not flushed here is lost.
+  try {
+    if (currentUser) await saveStateToFirestore();
+  } catch (e) {
+    console.error("Pre-sign-out flush failed:", e);
+  }
   auth.signOut().then(() => {
-    showAuthToast("Signed out. Progress saved locally.", "info");
+    showAuthToast("Signed out. Progress is safe in your Google account.", "info");
   });
 }
 

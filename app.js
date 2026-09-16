@@ -2276,6 +2276,10 @@ function saveState() {
   // Write to localStorage immediately so nothing is lost. Strip the transient
   // undo snapshot first — it's a full copy of every day and would roughly
   // double the saved size for no benefit (undo only needs to work in-session).
+  // While the sign-in gate is up we don't know whose progress this is yet, so
+  // nothing gets written to disk. Boot-time migrations that run before auth
+  // resolves simply re-run on the next load, which is harmless.
+  if (document.body && document.body.classList.contains("app-locked")) return;
   const { rolloverUndoSnapshot, ...persistable } = appState;
   localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(persistable));
   // Debounce Firestore writes — collapse rapid saves into one network call
