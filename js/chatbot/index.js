@@ -2,44 +2,56 @@
 // CHATBOT ENTRY POINT
 //
 // Owns the conversation loop: send -> model -> parse -> validate -> preview ->
-// (user clicks Apply) -> snapshot -> apply -> toast with Undo.
+// (user clicks Apply) -> apply (records its inverse for undo) -> toast with Undo.
 //
 // Nothing is ever applied straight from a model response.
 // ============================================================================
 
-import { ChatbotPanel } from "./panel.js?v=20260916a";
-import * as adapter from "./adapter.js?v=20260916a";
-import * as auth from "./auth.js?v=20260916a";
-import * as history from "./history.js?v=20260916a";
+import { ChatbotPanel } from "./panel.js?v=20260927c";
+import * as adapter from "./adapter.js?v=20260927c";
+import * as auth from "./auth.js?v=20260927c";
+import * as history from "./history.js?v=20260927c";
 import {
   callModel, ChatbotApiError, loadSettings, estimateCost, getModel, hasApiKey
-} from "./api.js?v=20260916a";
+} from "./api.js?v=20260927c";
 import {
   buildSystemPrompt, buildContextMessage, JSON_RETRY_MESSAGE, buildValidationRetryMessage
-} from "./prompt.js?v=20260916a";
+} from "./prompt.js?v=20260927c";
 import {
-  validateBatch, findRiskyOperations, expandRecurrence, MAX_QUESTIONS
-} from "./operations.js?v=20260916a";
+  validateBatch, findRiskyOperations, expandRecurrence, MAX_QUESTIONS, addDays, spreadDates
+} from "./operations.js?v=20260927c";
+
+const MAX_LOOKUP_ROUNDS = 2;
 
 const state = {
   panel: null,
   conversation: [],          // [{role, content}] sent to the model
   lastUserMessage: "",
   needInfoRounds: 0,
+  abort: null,               // AbortController for the request in flight
+  awaitingAnswer: false,     // last turn asked the user a question
+  lookupRounds: 0,
   session: { inputTokens: 0, outputTokens: 0, cost: 0 },
   recentlyDiscussedTaskIds: [],
   pendingBatch: null         // { operations, summary, risky }
 };
 
 // --- Boot -------------------------------------------------------------------
-function boot() {
+const BOOT_TIMEOUT_MS = 30000;
+function boot(startedAt = Date.now()) {
   if (!adapter.isHostReady()) {
     // The host populates its state during its own DOMContentLoaded handler; if
     // we win the race, wait a tick and retry rather than mounting against nothing.
-    return setTimeout(boot, 120);
+    if (Date.now() - startedAt > BOOT_TIMEOUT_MS) {
+      console.warn("[chatbot] gave up waiting for the tracker's state after 30s; the assistant panel was not mounted.");
+      return;
+    }
+    return setTimeout(() => boot(startedAt), 120);
   }
 
-  adapter.rehydrate();
+  // Host state is only real after auth + migration; rehydrate from that.
+  if (window.__appStateLoaded) adapter.rehydrate();
+  window.addEventListener("app:state-loaded", () => adapter.rehydrate());
 
   state.panel = new ChatbotPanel({
     onSend: handleSend,
@@ -47,10 +59,12 @@ function boot() {
     onApply: handleApply,
     onCancel: () => { state.pendingBatch = null; },
     onUndo: handleUndo,
+    onAbort: () => { if (state.abort) state.abort.abort(); },
     onSignOut: () => { auth.signOut(); }
   });
 
-  state.panel.refreshFooter({ canUndo: history.undoDepth() > 0 });
+  state.panel.refreshFooter({ canUndo: adapter.undoDepth() > 0 });
+  window.addEventListener("app:state-loaded", () => state.panel.refreshFooter({ canUndo: adapter.undoDepth() > 0 }));
 
   auth.setRejectionHandler((msg) => {
     state.panel.setLocked(true);
@@ -71,7 +85,9 @@ function boot() {
   state.panel.setLocked(true);
   auth.mountSignIn(state.panel.signinSlot);
 
-  window.__chatbot = debugApi(); // test hooks; see Part 10 verification
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    window.__chatbot = debugApi(); // test hooks; see Part 10 verification
+  }
 }
 
 function greet() {
@@ -99,24 +115,58 @@ async function handleSend(text) {
   p.clearPreview();
   state.pendingBatch = null;
   p.addUser(text);
+
+  // If the previous turn asked a question, this message is the answer:
+  // continue that conversation instead of starting over.
+  if (state.awaitingAnswer && state.conversation.length) {
+    state.awaitingAnswer = false;
+    await runTurn(text, { fresh: false });
+    return;
+  }
+
   state.lastUserMessage = text;
   state.needInfoRounds = 0;
+  state.lookupRounds = 0;
   state.conversation = [];
-
   await runTurn(text, { fresh: true });
 }
 
 async function handleChipAnswers(text) {
   const p = state.panel;
+  state.awaitingAnswer = false;
   p.addUser(text);
   await runTurn(text, { fresh: false });
 }
 
-async function runTurn(userText, { fresh }) {
+// Busy-label updater passed to every callModel as onRetry.
+function retryLabel(attempt, kind) {
+  const label = kind === "rate_limit" ? `Rate limited — retrying (${attempt}/2)…`
+    : kind === "truncated" ? "Reply was cut off — retrying with more room…"
+    : kind === "network" ? `Connection problem — retrying (${attempt}/2)…`
+    : `API busy — retrying (${attempt}/2)…`;
+  state.panel.setBusy(true, label);
+}
+
+// Turns whatever the model sent as `questions` into a clean, capped array.
+function asQuestions(q) {
+  return Array.isArray(q) ? q.slice(0, MAX_QUESTIONS) : [];
+}
+
+// One request/response round, cancellable from the busy indicator's Cancel button.
+async function runTurn(userText, opts) {
+  state.abort = new AbortController();
+  try {
+    await runTurnInner(userText, opts);
+  } finally {
+    state.abort = null;
+  }
+}
+
+async function runTurnInner(userText, { fresh }) {
   const p = state.panel;
 
-  // Build context. If the message references something outside the 21-day
-  // window, a local text search adds only the matching tasks.
+  // Build context: tasks for today..+14 days, plus keyword matches from
+  // anywhere in the plan. Further ranges come via a need_info "lookup".
   const matched = adapter.searchTasks(userText);
   const ctx = adapter.getState({
     recentlyDiscussedTaskIds: state.recentlyDiscussedTaskIds.slice(-10),
@@ -139,11 +189,8 @@ async function runTurn(userText, { fresh }) {
     reply = await callModel({
       system,
       messages: state.conversation,
-      onRetry: (attempt, kind) => {
-        p.setBusy(true, kind === "rate_limit"
-          ? `Rate limited — retrying (${attempt}/2)…`
-          : `API busy — retrying (${attempt}/2)…`);
-      }
+      signal: state.abort.signal,
+      onRetry: retryLabel
     });
   } catch (e) {
     p.setBusy(false);
@@ -160,7 +207,7 @@ async function runTurn(userText, { fresh }) {
     state.conversation.push({ role: "assistant", content: reply.text });
     state.conversation.push({ role: "user", content: JSON_RETRY_MESSAGE });
     try {
-      reply = await callModel({ system, messages: state.conversation });
+      reply = await callModel({ system, messages: state.conversation, signal: state.abort.signal, onRetry: retryLabel });
       trackUsage(reply);
       parsed = parseModelJson(reply.text);
     } catch (e) {
@@ -170,28 +217,38 @@ async function runTurn(userText, { fresh }) {
     }
     if (!parsed) {
       p.setBusy(false);
-      p.addError("The model didn't return usable JSON.", reply.text.slice(0, 600));
+      p.addError(reply.truncated
+        ? "The reply was cut off at the output limit, so it couldn't be read."
+        : "The model didn't return usable JSON.", reply.text.slice(0, 600));
       return;
     }
+  }
+  if (reply.truncated) {
+    p.addSystem("Note: the model's reply hit the output limit even after retrying with more room, so it may be incomplete. Try a smaller request.");
   }
 
   state.conversation.push({ role: "assistant", content: reply.text });
   p.setBusy(false);
 
-  // --- need_info ---
-  if (parsed.status === "need_info") {
-    state.needInfoRounds += 1;
-    const questions = (parsed.questions || []).slice(0, MAX_QUESTIONS);
-    if (state.needInfoRounds >= 2 || questions.length === 0) {
-      // Second round of questions: stop the chip loop, show what it understood
-      // and let the user answer in free text.
-      p.addBot(parsed.partialUnderstanding ||
-        "I still need a bit more detail. Could you rephrase with the specifics?");
-      p.addSystem("Answer in the box below and I'll try again.");
-      p.focusInput();
+  // --- lookup: the model asked for tasks in a date range ---
+  if (parsed.status === "need_info" && parsed.lookup && !asQuestions(parsed.questions).length) {
+    if (state.lookupRounds >= MAX_LOOKUP_ROUNDS) {
+      p.addError("The assistant kept asking for more of the plan, so I stopped.", "Try naming the dates or tasks more specifically.");
       return;
     }
-    p.askQuestions(questions, parsed.partialUnderstanding);
+    state.lookupRounds += 1;
+    const { startDate, endDate } = parsed.lookup;
+    const found = adapter.lookupTasks(startDate, endDate);
+    p.addSystem(found.error
+      ? `Lookup failed: ${found.error}`
+      : `Looked up ${found.tasks.length} task${found.tasks.length === 1 ? "" : "s"} from ${found.startDate} to ${found.endDate}.`);
+    await runTurn(`LOOKUP RESULT (JSON)\n${JSON.stringify(found)}`, { fresh: false });
+    return;
+  }
+
+  // --- need_info ---
+  if (parsed.status === "need_info") {
+    handleNeedInfo(parsed);
     return;
   }
 
@@ -203,6 +260,24 @@ async function runTurn(userText, { fresh }) {
   }
 
   await validateAndPreview(parsed, system);
+}
+
+// Every need_info answer from the model, wherever it arrives (first reply or
+// after a validation retry), counts toward the same 2-round cap.
+function handleNeedInfo(parsed) {
+  const p = state.panel;
+  state.awaitingAnswer = true;
+  state.needInfoRounds += 1;
+  const questions = asQuestions(parsed.questions);
+  if (state.needInfoRounds >= 2 || questions.length === 0) {
+    // Stop the chip loop: show what it understood and let the user answer in free text.
+    p.addBot(parsed.partialUnderstanding ||
+      "I still need a bit more detail. Could you rephrase with the specifics?");
+    p.addSystem("Answer in the box below and I'll try again.");
+    p.focusInput();
+    return;
+  }
+  p.askQuestions(questions, parsed.partialUnderstanding);
 }
 
 async function validateAndPreview(parsed, system, isRetry = false) {
@@ -217,7 +292,7 @@ async function validateAndPreview(parsed, system, isRetry = false) {
       state.conversation.push({ role: "user", content: buildValidationRetryMessage(result.errors) });
       let reply;
       try {
-        reply = await callModel({ system, messages: state.conversation });
+        reply = await callModel({ system, messages: state.conversation, signal: state.abort.signal, onRetry: retryLabel });
       } catch (e) { p.setBusy(false); reportApiError(e); return; }
       trackUsage(reply);
       p.setBusy(false);
@@ -227,10 +302,11 @@ async function validateAndPreview(parsed, system, isRetry = false) {
         return validateAndPreview(retryParsed, system, true);
       }
       if (retryParsed && retryParsed.status === "need_info") {
-        p.askQuestions((retryParsed.questions || []).slice(0, MAX_QUESTIONS), retryParsed.partialUnderstanding);
+        handleNeedInfo(retryParsed);
         return;
       }
     }
+    state.awaitingAnswer = false;
     p.addError(
       `${result.errors.length} operation${result.errors.length === 1 ? "" : "s"} failed validation — nothing was applied.`,
       result.errors.map(e => `[${e.index}${e.op ? ` ${e.op}` : ""}] ${e.message}`).join("\n")
@@ -313,13 +389,17 @@ function describeChanges(operations, vctx) {
       case "add_category":
         out.push({ kind: "add", date: null, title: `Category: ${op.displayName}`, detail: op.key, reason: op.reason });
         break;
-      case "add_project":
+      case "add_project": {
+        const names = (op.subtasks && op.subtasks.length) ? op.subtasks : [op.name];
+        const today = vctx.today;
+        const start = addDays(today, 1) <= op.targetDate ? addDays(today, 1) : op.targetDate;
+        const dates = spreadDates(start, op.targetDate, names.length);
         out.push({ kind: "add", date: op.targetDate, title: `Project: ${op.name}`,
-          detail: `${(op.subtasks || []).length} subtask(s)`, reason: op.reason });
+          detail: `due · ${names.length} task(s)`, reason: op.reason });
+        names.forEach((n, i) => out.push({ kind: "add", date: dates[i],
+          title: names.length === 1 && n === op.name ? op.name : `${op.name}: ${n}`, detail: "projects · 2h", reason: op.reason }));
         break;
-      case "add_subsection":
-        out.push({ kind: "add", date: null, title: `Section: ${op.title}`, detail: op.key, reason: op.reason });
-        break;
+      }
     }
   });
   return out;
@@ -343,19 +423,14 @@ function handleApply() {
     return;
   }
 
-  // Snapshot BEFORE mutating.
-  const snap = adapter.snapshot();
-  const stored = history.pushSnapshot(snap, {
-    label: batch.summary || "Assistant change",
-    message: state.lastUserMessage
-  });
-
+  // applyOperations is all-or-nothing and records the batch's inverse for undo.
   let result;
   try {
-    result = adapter.applyOperations(batch.operations);
+    result = adapter.applyOperations(batch.operations, {
+      label: batch.summary || "Assistant change",
+      message: state.lastUserMessage
+    });
   } catch (e) {
-    // Roll straight back if anything threw mid-apply.
-    adapter.restore(snap);
     p.addError("Applying failed, so the plan was rolled back.", e && e.message);
     state.pendingBatch = null;
     return;
@@ -370,7 +445,7 @@ function handleApply() {
   });
 
   // Remember what we touched so "move that one" resolves next turn.
-  state.recentlyDiscussedTaskIds.push(...result.created.map(c => c.task.id));
+  state.recentlyDiscussedTaskIds.push(...result.created.map(c => c.task.id), ...result.touched);
   state.recentlyDiscussedTaskIds = state.recentlyDiscussedTaskIds.slice(-25);
 
   const changed = [...result.changedDates];
@@ -380,30 +455,25 @@ function handleApply() {
   const n = result.created.length;
   const r = result.removed.length;
   p.addSystem(`Applied · ${n} added${r ? `, ${r} removed` : ""}${changed.length ? ` across ${changed.length} day${changed.length === 1 ? "" : "s"}` : ""}.`);
-  p.refreshFooter({ canUndo: history.undoDepth() > 0 });
+  p.refreshFooter({ canUndo: adapter.undoDepth() > 0 });
 
-  p.toast(
-    `Applied: ${batch.summary || "changes"}`,
-    stored ? "Undo" : null,
-    () => handleUndo()
-  );
+  p.toast(`Applied: ${batch.summary || "changes"}`, "Undo", () => handleUndo());
 
   state.pendingBatch = null;
 }
 
+// Reverts only what the last batch did. The log entry is removed by the
+// adapter only after the undo succeeds, so a failed undo can be retried.
 function handleUndo() {
   const p = state.panel;
-  const entry = history.popSnapshot();
-  if (!entry) {
-    p.addSystem("Nothing left to undo.");
-    p.refreshFooter({ canUndo: false });
-    return;
+  const res = adapter.undoLast();
+  if (!res.ok) {
+    p.addSystem(res.label ? `Undo failed — nothing was changed. ${res.message || ""}`.trim() : (res.message || "Nothing left to undo."));
+  } else {
+    adapter.highlightDays([...(res.changedDates || [])]);
+    p.addSystem(`Undone: ${res.label}` + (res.skipped && res.skipped.length ? ` (${res.skipped.join("; ")})` : ""));
   }
-  const ok = adapter.restore(entry.snapshot);
-  p.addSystem(ok
-    ? `Undone: ${entry.label}`
-    : "Undo failed — that snapshot couldn't be restored.");
-  p.refreshFooter({ canUndo: history.undoDepth() > 0 });
+  p.refreshFooter({ canUndo: adapter.undoDepth() > 0 });
 }
 
 // --- Helpers ----------------------------------------------------------------
@@ -436,14 +506,14 @@ function trackUsage(reply) {
   state.panel.refreshFooter({
     tokens: state.session.inputTokens + state.session.outputTokens,
     cost: state.session.cost,
-    canUndo: history.undoDepth() > 0
+    canUndo: adapter.undoDepth() > 0
   });
 }
 
 function reportApiError(e) {
   const p = state.panel;
   if (!(e instanceof ChatbotApiError)) {
-    if (e && e.name === "AbortError") return;
+    if (e && e.name === "AbortError") { p.addSystem("Cancelled. Nothing was changed."); return; }
     p.addError("Something went wrong.", e && e.message);
     return;
   }
@@ -452,6 +522,7 @@ function reportApiError(e) {
       p.addError(e.message, "Click the ⚙ gear at the top of this panel.");
       break;
     case "auth":
+    case "forbidden":
       p.addError(e.message);
       break;
     case "rate_limit":
@@ -485,7 +556,7 @@ function debugApi() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
+  document.addEventListener("DOMContentLoaded", () => boot());
 } else {
   boot();
 }

@@ -1,5 +1,23 @@
-// Git Developer Productivity Tool — 8-week roadmap (Tejaswi + Thanishka)
+// Git Developer Productivity Tool — SUMMER roadmap (Tejaswi + Thanishka), history only
 // Loaded before app.js; exposes GIT_PROJECT_ROADMAP and buildGitProjectTasksForDay()
+//
+// These dates are in the past and already completed, so they are deliberately
+// NOT rescheduled. The roadmap is 8 numbered weeks over 11 calendar weeks:
+//   - Weeks 1-3 run Jun 15 - Jul 5. Week 1 (Jun 15-21) and the first days of
+//     Week 2 fall in the heavyPrep window (Jun 15-23, intensive Palana
+//     onboarding prep): only the Monday planning meeting is generated there,
+//     so Week 1 has no roadmap work items and no Wednesday DEADLINE (Jun 17).
+//   - Week 3 (Jun 29 - Jul 5) falls entirely inside the India trip
+//     (Jun 24 - Jul 8): only travelFriendly items are generated, capped at 0.5 h.
+//   - Jul 6 - Jul 26 is an intentional gap (end of the trip + catch-up), so
+//     Week 4 starts Jul 27. No day in the gap belongs to any week.
+//   - Weeks 4-8 run Jul 27 - Aug 30.
+// validateGitRoadmap() checks the table stays consistent (ordered,
+// non-overlapping, 7-day weeks).
+//
+// From Sept 16 the plan's Git work is tracked by the dated "Git Developer
+// Tool" project in plan-extension-2026.js (sessions tagged
+// projectId "git_developer_tool", COMPLETE milestone Oct 4), not by this file.
 
 const GIT_PROJECT_START = "2026-06-15";
 // Cadence: Monday start-of-week planning, lead-up work on Mon/Tue, and a
@@ -174,6 +192,23 @@ function buildGitProjectTasksForDay(dateStr, dayOfWeek, isIndia) {
   }
 
   return tasks;
+}
+
+// Returns a list of problems with GIT_PROJECT_ROADMAP (empty when consistent).
+function validateGitRoadmap(roadmap) {
+  const weeks = roadmap || GIT_PROJECT_ROADMAP;
+  const issues = [];
+  const DAY = 86400000;
+  weeks.forEach((w, i) => {
+    if (w.week !== i + 1) issues.push(`entry ${i} is numbered week ${w.week}`);
+    if (!(w.start <= w.end)) issues.push(`week ${w.week} ends before it starts`);
+    const span = Math.round((parseGitDate(w.end) - parseGitDate(w.start)) / DAY) + 1;
+    if (span !== 7) issues.push(`week ${w.week} spans ${span} days`);
+    if (new Date(parseGitDate(w.start)).getDay() !== 1) issues.push(`week ${w.week} doesn't start on a Monday`);
+    if (!Array.isArray(w.tasks) || !w.tasks.length) issues.push(`week ${w.week} has no tasks`);
+    if (i > 0 && !(weeks[i - 1].end < w.start)) issues.push(`week ${w.week} overlaps week ${weeks[i - 1].week}`);
+  });
+  return issues;
 }
 
 function parseGitDate(str) {

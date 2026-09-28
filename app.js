@@ -1,5 +1,19 @@
 // Cybersecurity Study Plan - Core Scheduler & UI Engine
 
+function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function safeUrl(url) {
+  try {
+    const u = String(url ?? "").trim();
+    if (/^(https?|mailto):/i.test(u)) return u;
+  } catch (e) {}
+  return "#";
+}
+
 const MOTIVATIONAL_QUOTES = [
   "Hacking in style... 💖",
   "SecOps, but make it fashion. 💅",
@@ -199,9 +213,9 @@ const BUILT_IN_EXTRACURRICULARS = [
     name: "Palana Preparation",
     role: "Onboarding",
     categoryId: "palana",
-    status: "active-through-june-27",
+    status: "completed",
     weeklyHours: 15,
-    nextEvent: "June 15-27",
+    nextEvent: "Ended June 27",
     notes: "Pre-onboarding security engineering preparation"
   },
   {
@@ -211,7 +225,7 @@ const BUILT_IN_EXTRACURRICULARS = [
     categoryId: "leetcode",
     status: "active",
     weeklyHours: 5,
-    nextEvent: "Daily (1 problem/day)",
+    nextEvent: "Daily practice",
     notes: "Algorithm problem solving"
   },
   {
@@ -221,7 +235,7 @@ const BUILT_IN_EXTRACURRICULARS = [
     categoryId: "secplus",
     status: "active",
     weeklyHours: 10,
-    nextEvent: "Target: Sept 2",
+    nextEvent: "Exam: Sept 18, 2026",
     notes: "Certification exam prep"
   },
   {
@@ -231,7 +245,7 @@ const BUILT_IN_EXTRACURRICULARS = [
     categoryId: "aws",
     status: "active-until-passed",
     weeklyHours: 6,
-    nextEvent: "Target: June 23",
+    nextEvent: "Exam date is set in the plan",
     notes: "Certification exam prep"
   }
 ];
@@ -311,7 +325,7 @@ const CORE_CURRICULUM = {
     { id: "aws_rev_6", title: "AWS Review: Monitoring, Scaling & Elasticity", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
     { id: "aws_rev_7", title: "AWS Review: Pricing, Support Plans & TCO", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
     { id: "aws_exam_prep", title: "AWS Skill Builder Mock Exam & Review", duration: 1.5, link: "https://skillbuilder.aws/exam-prep/cloud-practitioner" },
-    { id: "aws_exam", title: "AWS AI Practitioner Certification Exam", duration: 1.5, link: "https://aws.amazon.com/certification/certified-ai-practitioner/" }
+    { id: "aws_exam", title: "AWS AI Practitioner Certification Exam", duration: 1.5, exam: true, link: "https://aws.amazon.com/certification/certified-ai-practitioner/" }
   ],
   
   // PortSwigger Tasks (Track 1)
@@ -395,12 +409,41 @@ const CORE_CURRICULUM = {
 const SCHEDULE_VERSION = 8;
 const PLAN_TIMEZONE = "America/Los_Angeles";
 
+// False until a signed-in user's state has been chosen (cloud vs local) and run
+// through runStatePipeline(); saving before then could persist the wrong user's data.
+let stateReady = false;
+
+// Settings for a brand-new or reset plan. origin: "fresh" marks a state that
+// has no personal history, so the one-time "mark past days complete" passes
+// (August, June/July, Sept 1-2, Sept 3-15) never run on it. The owner's
+// pre-existing state has no origin field and keeps its history behaviour.
+function defaultSettings() {
+  return {
+    maxNormalDailyHours: 8,
+    palanaEnabled: true,
+    awsExamPassed: false,
+    securityPlusExamPassed: false,
+    awscpExamPassed: false,
+    selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"],
+    lastRolloverDay: null,
+    scheduleVersion: SCHEDULE_VERSION,
+    palanaSecurityEnabled: true,
+    ahfWeeklyTarget: 7,
+    origin: "fresh"
+  };
+}
+
+function isFreshState() {
+  return !!(appState && appState.settings && appState.settings.origin === "fresh");
+}
+
 let appState = {
   settings: {
     maxNormalDailyHours: 8,
     palanaEnabled: true,
     awsExamPassed: false,
     securityPlusExamPassed: false,
+    awscpExamPassed: false,
     selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"], // default projects
     lastRolloverDay: null, // date string representing the last day forced rollover
     scheduleVersion: SCHEDULE_VERSION,
@@ -424,13 +467,11 @@ const INDIA_END_STR = "2026-07-08";
 const INFO_START_STR = "2026-06-22";
 const INFO_END_STR = "2026-08-21";
 const SECPLUS_START_DATE = "2026-08-03";
+// Old base-plan exam date. The exam now lives on 2026-09-18 (plan extension);
+// kept only so migrateRolloverAndExamsV1 can find the retired Sept 1 copy.
 const SECPLUS_EXAM_DATE = "2026-09-01";
 const SECPLUS_PLAN_DEADLINE = "2026-09-01";
 const LEETCODE_START_2PERDAY = "2026-07-26";
-
-// Palana job: onboarding begins the week of June 27, 2026. Intensive prep is
-// front-loaded into the lead-up window (plan start → day before onboarding).
-const PALANA_ONBOARDING_STR = "2026-06-27";
 
 // Detailed Palana Preparation tasks (June 15–28, 2026). Mentor meetings come from buildMentorTasksForDay().
 const PALANA_PREP_TASKS_DETAILED = {
@@ -558,19 +599,6 @@ const AHF_TASKS_DETAILED = {
   ]
 };
 
-const PALANA_PREP_TASKS = [
-  "Palana Prep: Company mission, safety domain & product deep-dive",
-  "Palana Prep: Set up dev environment, accounts & onboarding tooling",
-  "Palana Prep: Study the tech stack & architecture documentation",
-  "Palana Prep: Review safety/compliance standards & domain knowledge",
-  "Palana Prep: Role-specific skill brush-up & hands-on exercises",
-  "Palana Prep: Read team repos, codebase & contribution guidelines",
-  "Palana Prep: Draft onboarding goals, questions & a 30-day plan",
-  "Palana Prep: Research the team & prepare intro/networking notes",
-  "Palana Prep: Mock tasks & practice in the problem space",
-  "Palana Prep: Consolidate notes & final onboarding readiness review"
-];
-
 // 5. HELPER DATE FUNCTIONS
 function parseDate(dateStr) {
   const parts = dateStr.split('-');
@@ -588,7 +616,9 @@ function getDaysBetween(startStr, endStr) {
   const start = parseDate(startStr);
   const end = parseDate(endStr);
   const diffTime = Math.abs(end - start);
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // round, not ceil: across a DST change two local midnights are 23 or 25 hours
+  // apart, and ceil would count that as an extra day.
+  return Math.round(diffTime / (1000 * 60 * 60 * 24));
 }
 
 function getDayOfWeek(dateStr) {
@@ -603,7 +633,7 @@ function getRealCurrentDate() {
   
   // Convert to LA timezone using Intl API (timezone-aware)
   const laFormatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
+    timeZone: PLAN_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -629,14 +659,6 @@ function planToday() {
   if (real < START_DATE_STR) return START_DATE_STR;
   if (real > END_DATE_STR) return END_DATE_STR;
   return real;
-}
-
-function isPlanPast(dateStr) {
-  return dateStr < planToday();
-}
-
-function isPlanFuture(dateStr) {
-  return dateStr > planToday();
 }
 
 // Merge built-in + user custom categories
@@ -680,7 +702,6 @@ function isInfo310Class(dateStr) {
   return dateStr >= INFO_START_STR && dateStr <= INFO_END_STR;
 }
 
-// True during the Palana onboarding lead-up window (plan start → day before onboarding).
 // ⭐ NEW: Helper function to build AHF tasks for a day
 function buildAHFTasksForDay(dateStr) {
   // Use detailed tasks if available for June 15-23 period
@@ -696,15 +717,40 @@ function buildAHFTasksForDay(dateStr) {
     }));
   }
   
-  // Default: 1-hour AHF tech lead work for other days
+  // Default: daily AHF tech lead work, sized from Settings → AHF weekly target.
   return [{
     id: `${dateStr}_ahf`,
     category: "ahf",
     title: "AHF Work (Tech Lead Duties)",
-    duration: 1.0,
+    duration: ahfDailyHoursFromTarget(),
     completed: false,
     link: null
   }];
+}
+
+// Settings → "AHF Weekly Hour Target" / 7, e.g. the default 7 h → 1 h per day.
+function ahfDailyHoursFromTarget() {
+  const target = Number(appState.settings && appState.settings.ahfWeeklyTarget);
+  return target > 0 ? Math.round((target / 7) * 100) / 100 : 1.0;
+}
+
+// Applies a changed AHF weekly target to the default daily AHF tasks that are
+// still ahead (base "<date>_ahf" and extension "<date>_x_ahf"), unchecked only.
+function resizeFutureAhfTasks() {
+  const today = getRealCurrentDate();
+  const hours = ahfDailyHoursFromTarget();
+  let n = 0;
+  appState.days.forEach(day => {
+    if (day.date <= today) return;
+    day.tasks.forEach(t => {
+      if (t.completed || (t.id !== `${day.date}_ahf` && !/_x_ahf$/.test(t.id))) return;
+      if (t.duration === hours) return;
+      t.duration = hours;
+      if (typeof touchTask === "function") touchTask(t);
+      n++;
+    });
+  });
+  return n;
 }
 
 // ⭐ NEW: Helper function to build recurring mentor meetings
@@ -779,10 +825,6 @@ function buildWinfoTasksForDay(dateStr) {
   return tasks;
 }
 
-function isPalanaPrepWindow(dateStr) {
-  return dateStr >= START_DATE_STR && dateStr < PALANA_ONBOARDING_STR;
-}
-
 // Builds the Palana task for a given day (or null if none should be scheduled).
 // Before onboarding: intensive daily "Palana Onboarding Prep" blocks.
 // Post-onboarding Palana Security work runs on a repeating 3-week cycle,
@@ -814,10 +856,10 @@ function buildPalanaTaskForDay(dateStr, dayOfWeek, isIndia) {
     }));
   }
 
-  // After onboarding the Palana Security role is active, so the work cycle
-  // always runs Mon–Fri on the repeating 3-week threat-model → test → mitigate
-  // rotation (no toggle required).
-  if (dateStr >= PALANA_CYCLE_START) {
+  // After onboarding, the Palana Security cycle runs Mon–Fri on the repeating
+  // 3-week threat-model → test → mitigate rotation, while Settings → "Activate
+  // Palana Security Role" (palanaSecurityEnabled) is on.
+  if (dateStr >= PALANA_CYCLE_START && appState.settings.palanaSecurityEnabled !== false) {
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
       const weeksIn = Math.floor(getDaysBetween(PALANA_CYCLE_START, dateStr) / 7);
       const phaseIdx = ((weeksIn % 3) + 3) % 3;
@@ -870,7 +912,6 @@ function generateBaseSchedule() {
     const dateStr = formatDate(current);
     const dayOfWeek = getDayOfWeek(dateStr);
     const isIndia = isIndiaTrip(dateStr);
-    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     
     const dayObj = {
       date: dateStr,
@@ -898,7 +939,7 @@ function generateBaseSchedule() {
           duration: 0.75,
           completed: false,
           link: p.link,
-          leetcodeId: p.id,
+          leetcodeNumber: p.id,
           microsoftOA: true
         });
       });
@@ -910,7 +951,7 @@ function generateBaseSchedule() {
         duration: 0.5,
         completed: false,
         link: "https://neetcode.io/practice/practice/blind75",
-        leetcodeId: null
+        leetcodeNumber: null
       });
       dayObj.tasks.push({
         id: `${dateStr}_leetcode_2`,
@@ -919,7 +960,7 @@ function generateBaseSchedule() {
         duration: 0.5,
         completed: false,
         link: "https://neetcode.io/practice/practice/blind75",
-        leetcodeId: null
+        leetcodeNumber: null
       });
     }
 
@@ -971,16 +1012,19 @@ function generateBaseSchedule() {
     const lcTasks = day.tasks.filter(t => t.category === "leetcode" && !t.microsoftOA);
     for (const lcTask of lcTasks) {
       if (lcIndex < 75) {
-        lcTask.title = `LeetCode Blind 75: #${BLIND_75_QUESTIONS[lcIndex].id} - ${BLIND_75_QUESTIONS[lcIndex].name}`;
-        lcTask.link = BLIND_75_QUESTIONS[lcIndex].link;
-        lcTask.leetcodeId = BLIND_75_QUESTIONS[lcIndex].id;
+        const q = BLIND_75_QUESTIONS[lcIndex];
+        lcTask.title = blind75Title(q);
+        lcTask.link = q.link;
+        lcTask.leetcodeNumber = q.lc;
+        lcTask.blind75Seq = q.seq;
         lcIndex++;
       }
     }
   }
   // Remove unassigned leetcode placeholders
   for (const day of daysList) {
-    day.tasks = day.tasks.filter(t => t.category !== "leetcode" || t.leetcodeId !== null);
+    day.tasks = day.tasks.filter(t => t.category !== "leetcode" || t.leetcodeNumber !== null);
+    day.tasks.forEach(t => { t.source = "base"; });
   }
 
   // Create Curriculum Backlog (Tracks 1, 2, 3, 4)
@@ -1002,7 +1046,8 @@ function generateBaseSchedule() {
       category: "aws",
       title: t.title,
       duration: t.duration,
-      link: t.link
+      link: t.link,
+      exam: t.exam
     });
   });
 
@@ -1024,19 +1069,8 @@ function generateBaseSchedule() {
   // Apply the fixed 30-day Security+ plan (Day 1 = SECPLUS_START_DATE)
   applySecplusDailyPlan(daysList);
 
-  // Place Security+ exam on the deadline (Sept 1) as a fixed task
-  const examDay = daysList.find(d => d.date === SECPLUS_EXAM_DATE);
-  if (examDay && !examDay.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
-    examDay.tasks.push({
-      id: `${SECPLUS_EXAM_DATE}_sec_exam`,
-      category: "secplus",
-      title: "CompTIA Security+ SY0-701 Certification Exam",
-      duration: 2.5,
-      completed: false,
-      fixed: true,
-      link: "https://www.comptia.org/certifications/security"
-    });
-  }
+  // The Security+ exam itself is owned by the plan extension (Sept 18, the
+  // real booking) — the base plan no longer places one.
 
   appState.days = daysList;
 }
@@ -1049,15 +1083,17 @@ function applySecplusDailyPlan(daysList) {
   const startDate = parseDate(SECPLUS_START_DATE);
   const deadline = parseDate(SECPLUS_PLAN_DEADLINE);
 
-  const completedPlanDays = new Set();
+  // Any plan day already on the calendar — completed, or rolled/moved to
+  // another date — is not re-issued on its original date.
+  const placedPlanDays = new Set();
   daysList.forEach(d => d.tasks.forEach(t => {
-    if (t.category === "secplus" && t.completed && typeof t.planDay === "number") {
-      completedPlanDays.add(t.planDay);
+    if (t.category === "secplus" && typeof t.planDay === "number") {
+      placedPlanDays.add(t.planDay);
     }
   }));
 
   CORE_CURRICULUM.secplus.forEach(task => {
-    if (completedPlanDays.has(task.planDay)) return;
+    if (placedPlanDays.has(task.planDay)) return;
 
     const target = new Date(startDate);
     target.setDate(target.getDate() + (task.planDay - 1));
@@ -1067,9 +1103,6 @@ function applySecplusDailyPlan(daysList) {
     const day = daysList.find(d => d.date === dateStr);
     if (!day) return;
 
-    const already = day.tasks.some(t => t.category === "secplus" && t.planDay === task.planDay);
-    if (already) return;
-
     day.tasks.push({
       id: `${dateStr}_${task.id}`,
       category: "secplus",
@@ -1077,7 +1110,8 @@ function applySecplusDailyPlan(daysList) {
       duration: task.duration,
       completed: false,
       link: task.link,
-      planDay: task.planDay
+      planDay: task.planDay,
+      source: "base"
     });
   });
 }
@@ -1089,9 +1123,13 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
   // Clear any existing curriculum tasks from the days we are reflowing.
   // Keep completed tasks and all fixed/routine categories — only the curriculum
   // tracks (portswigger/aws/secplus/projects) get redistributed.
-  const KEEP_CATS = new Set(["ahf", "leetcode", "palana", "palana_security", "github", "mentor", "winfo", "personal"]);
+  // Only base-owned tasks inside the base window are ever removed; extension
+  // and user tasks are never touched, completed or not.
+  const KEEP_CATS = BASE_ROUTINE_CATS;
   for (let i = startDayIndex; i < daysArray.length; i++) {
-    daysArray[i].tasks = daysArray[i].tasks.filter(t => t.completed || KEEP_CATS.has(t.category));
+    if (daysArray[i].date > BASE_SCHEDULE_END) continue;
+    daysArray[i].tasks = daysArray[i].tasks.filter(t =>
+      t.completed || t.source !== "base" || KEEP_CATS.has(t.category));
   }
 
   let backlogIndex = 0;
@@ -1100,6 +1138,7 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
     if (backlogIndex >= backlog.length) break;
     
     const day = daysArray[i];
+    if (day.date > BASE_SCHEDULE_END) break;
     
     // Rule: PortSwigger (Track 1) runs June 13 - June 27, but drops to 0 hrs during India trip (starts June 24).
     // AWS runs first week (exam June 23).
@@ -1162,7 +1201,9 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
             title: task.title,
             duration: task.duration,
             completed: false,
-            link: task.link
+            link: task.link,
+            source: "base",
+            ...(task.exam ? { exam: true } : {})
           });
           scheduledHours += task.duration;
           backlogIndex++;
@@ -1176,7 +1217,8 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
               title: `${task.title} (Part A)`,
               duration: part1Duration,
               completed: false,
-              link: task.link
+              link: task.link,
+              source: "base"
             });
             scheduledHours += part1Duration;
 
@@ -1209,7 +1251,11 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
       overflowDate.setDate(overflowDate.getDate() + 1);
       const dateStr = formatDate(overflowDate);
       
-      const overflowDay = {
+      // Past the base window the date may already exist (plan extension).
+      // Put overflow on that day instead of creating a duplicate date; the
+      // tasks carry overflow:true so the next reflow can take them back.
+      const existingDay = daysArray.find(d => d.date === dateStr);
+      const overflowDay = existingDay || {
         date: dateStr,
         isIndia: false,
         maxCapacity: appState.settings.maxNormalDailyHours,
@@ -1218,7 +1264,8 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
         isOverflow: true
       };
       
-      let scheduledHours = 0;
+      let scheduledHours = existingDay ? existingDay.tasks.reduce((s, t) => s + t.duration, 0) : 0;
+      if (existingDay && scheduledHours >= overflowDay.maxCapacity) continue;
       
       while (scheduledHours < overflowDay.maxCapacity && backlogIndex < backlog.length) {
         const task = backlog[backlogIndex];
@@ -1231,7 +1278,10 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
             title: task.title,
             duration: task.duration,
             completed: false,
-            link: task.link
+            link: task.link,
+            source: "base",
+            overflow: true,
+            ...(task.exam ? { exam: true } : {})
           });
           scheduledHours += task.duration;
           backlogIndex++;
@@ -1244,7 +1294,9 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
               title: `${task.title} (Part A)`,
               duration: part1Duration,
               completed: false,
-              link: task.link
+              link: task.link,
+              source: "base",
+              overflow: true
             });
             scheduledHours += part1Duration;
             
@@ -1260,29 +1312,69 @@ function distributeCurriculumTasks(daysArray, backlog, startDayIndex) {
         }
       }
       
-      daysArray.push(overflowDay);
+      if (!existingDay) daysArray.push(overflowDay);
     }
   }
 }
 
 // 8. SMART ROLLOVER LOGIC ("I didn't finish today")
 // Categories that get spread across later days by available capacity
-// instead of piling onto today.
+// instead of piling onto the rollover target day.
 const ROLLOVER_DISTRIBUTE = new Set(["aws", "secplus", "leetcode"]);
-// Categories left exactly where they are (not rolled at all).
-const ROLLOVER_LEAVE = new Set([]);
 // Curriculum categories that get a reschedule-ledger entry for exports.
 const ROLLOVER_CURRICULUM = new Set(["portswigger", "aws", "secplus", "projects"]);
 
+// Legacy rolled-over marker. Rolled tasks are identified by `rolledFrom` now;
+// the suffix is only stripped (from old saved titles and ledger keys).
+function stripRolledSuffix(title) {
+  return String(title || "").replace(/ \(Rolled Over\)/g, "");
+}
+
+// Exams are identified by an explicit flag, never by title text.
+function isExamTask(t) {
+  return !!(t && t.exam === true);
+}
+
+function shortDate(dateStr) {
+  return parseDate(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function notifyUser(message, type) {
+  if (typeof showAuthToast === "function" && typeof document !== "undefined" && document.body) {
+    showAuthToast(message, type || "info");
+  } else {
+    console.log(message);
+  }
+}
+
+// Rolls the uncompleted, non-fixed tasks of `dayDateStr` forward.
+//   - Fixed tasks (exams, meetings, hackathon days, milestones) stay put.
+//   - Target day: today if the rolled day is today or in the past, otherwise
+//     the day after the rolled day.
+//   - AWS / Security+ / LeetCode spread across days after the target by
+//     capacity; everything else lands on the target.
+//   - Rolled tasks keep every field (id, planDay, projectId, subtasks, source…)
+//     and gain `rolledFrom`.
+// Returns a summary { target, toTarget, distributed, leftInPlace } or null.
 function forceRollover(dayDateStr) {
   const activeDayIndex = appState.days.findIndex(d => d.date === dayDateStr);
-  if (activeDayIndex === -1) return;
+  if (activeDayIndex === -1) return null;
+  const rolledDay = appState.days[activeDayIndex];
 
   const todayStr = getRealCurrentDate();
-  const todayDay = appState.days.find(d => d.date === todayStr);
-  if (!todayDay) {
-    alert("Today isn't in your plan range, so there's nowhere to roll tasks into. Nothing was changed.");
-    return;
+  let targetDay;
+  if (dayDateStr <= todayStr) {
+    targetDay = appState.days.find(d => d.date === todayStr);
+    if (!targetDay) {
+      alert("Today isn't in your plan range, so there's nowhere to roll tasks into. Nothing was changed.");
+      return null;
+    }
+  } else {
+    targetDay = appState.days.find(d => d.date > dayDateStr);
+    if (!targetDay) {
+      alert("There's no later day in your plan to roll these tasks into. Nothing was changed.");
+      return null;
+    }
   }
 
   // Save undo snapshot before modifying anything
@@ -1293,22 +1385,12 @@ function forceRollover(dayDateStr) {
     fromDate: dayDateStr
   };
 
-  // Mark the day itself as rolled over
-  appState.days[activeDayIndex].rolledOver = true;
+  rolledDay.rolledOver = true;
   appState.settings.lastRolloverDay = dayDateStr;
-
-  // 1. Gather every uncompleted task on or before the selected day, except
-  //    INFO 310 (left in place). Split into two buckets:
-  //      - toDistribute: AWS / Security+ / LeetCode → spread by capacity
-  //      - toToday:      everything else            → pile onto today
-  //    Tasks are removed from their original day so nothing is duplicated;
-  //    completed tasks and untouched INFO 310 tasks stay put.
-  const toDistribute = [];
-  const toToday = [];
 
   const recordLedger = (t, fromDate) => {
     if (!ROLLOVER_CURRICULUM.has(t.category)) return;
-    const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+    const cleanTitle = stripRolledSuffix(t.title).replace(" (Part A)", "").replace(" (Part B)", "");
     appState.rescheduleLedger = appState.rescheduleLedger || {};
     const led = appState.rescheduleLedger[cleanTitle] || { originalDate: (t.originalDate || fromDate), count: 0 };
     led.count += 1;
@@ -1317,61 +1399,75 @@ function forceRollover(dayDateStr) {
     appState.rescheduleLedger[cleanTitle] = led;
   };
 
-  // Only the day you actually rolled over is touched — no other day is
-  // gathered, cleared, or rescheduled.
-  const rolledDay = appState.days[activeDayIndex];
+  // Only the day you actually rolled over is touched.
+  const toDistribute = [];
+  const toTarget = [];
+  const leftInPlace = [];
   rolledDay.tasks.forEach(t => {
-    if (t.completed || ROLLOVER_LEAVE.has(t.category)) return;
+    if (t.completed) return;
+    if (t.fixed) { leftInPlace.push(t); return; }
     recordLedger(t, rolledDay.date);
-    const cleanTitle = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
-    const entry = {
-      category: t.category,
-      title: cleanTitle,
-      duration: t.duration || 0,
-      link: t.link || null,
-      originalDate: t.originalDate || rolledDay.date
-    };
-    (ROLLOVER_DISTRIBUTE.has(t.category) ? toDistribute : toToday).push(entry);
+    const moved = Object.assign({}, t, {
+      title: stripRolledSuffix(t.title),
+      completed: false,
+      rolledFrom: rolledDay.date,
+      originalDate: t.originalDate || rolledDay.date,
+      rescheduleCount: (t.rescheduleCount || 0) + 1,
+      updatedAt: Date.now()
+    });
+    (ROLLOVER_DISTRIBUTE.has(t.category) ? toDistribute : toTarget).push(moved);
   });
-  // Keep completed tasks and any untouched INFO 310 tasks on the rolled day
-  rolledDay.tasks = rolledDay.tasks.filter(t => t.completed || ROLLOVER_LEAVE.has(t.category));
+  rolledDay.tasks = rolledDay.tasks.filter(t => t.completed || t.fixed);
 
-  let rollSeq = 0;
-  const makeTask = (t, dateStr) => ({
-    id: `${dateStr}_rollover_${Date.now()}_${rollSeq++}_${t.category}`,
-    category: t.category,
-    title: t.title + " (Rolled Over)",
-    duration: t.duration,
-    completed: false,
-    link: t.link || null,
-    rolledFrom: dayDateStr,
-    originalDate: t.originalDate
-  });
+  // 1. Everything else goes onto the target day.
+  toTarget.forEach(t => targetDay.tasks.push(t));
 
-  // 2. Pile "everything else" onto today.
-  toToday.forEach(t => todayDay.tasks.push(makeTask(t, todayStr)));
-
-  // 3. Distribute AWS / Security+ / LeetCode across later days that have spare
-  //    capacity (skip India-trip days). Security+ first so it lands soonest;
-  //    earliest-fit keeps earlier days full and the load even.
+  // 2. AWS / Security+ / LeetCode spread across later days with spare capacity
+  //    (skip India-trip days). Security+ first so it lands soonest.
   const distOrder = { secplus: 1, aws: 2, leetcode: 3 };
   toDistribute.sort((a, b) => (distOrder[a.category] || 9) - (distOrder[b.category] || 9));
 
-  const candidateDays = appState.days.filter(d => d.date > todayStr && !d.isIndia);
+  const candidateDays = appState.days.filter(d => d.date > targetDay.date && !d.isIndia);
   const loadOf = (day) => day.tasks.reduce((s, t) => s + (t.duration || 0), 0);
-
+  const distributed = [];
   toDistribute.forEach(t => {
-    const target = candidateDays.find(d => loadOf(d) + t.duration <= d.maxCapacity);
-    // Fall back to today if no later day has room — never drop the task.
-    (target || todayDay).tasks.push(makeTask(t, (target || todayDay).date));
+    const dest = candidateDays.find(d => loadOf(d) + (t.duration || 0) <= d.maxCapacity) || targetDay;
+    dest.tasks.push(t);
+    distributed.push({ task: t, date: dest.date });
   });
 
-  // Save state & redraw UI
+  const summary = { target: targetDay.date, toTarget, distributed, leftInPlace };
+  appState.lastRolloverSummary = {
+    from: dayDateStr,
+    target: targetDay.date,
+    movedToTarget: toTarget.length,
+    distributed: distributed.map(d => ({ id: d.task.id, date: d.date })),
+    leftInPlace: leftInPlace.map(t => t.id)
+  };
+
   saveState();
   applyCategoryColors();
   initUI();
-  showDayDetails(todayStr);
+  showDayDetails(dayDateStr);
+  notifyUser(describeRollover(summary));
   playSynthSound("warning");
+  return summary;
+}
+
+function describeRollover(summary) {
+  const parts = [];
+  if (summary.toTarget.length) parts.push(`${summary.toTarget.length} → ${shortDate(summary.target)}`);
+  if (summary.distributed.length) {
+    const dates = [...new Set(summary.distributed.map(d => d.date))].sort();
+    const onTarget = dates.length === 1 && dates[0] === summary.target;
+    parts.push(onTarget
+      ? `${summary.distributed.length} study → ${shortDate(summary.target)} (no room later)`
+      : dates.length === 1
+        ? `${summary.distributed.length} study → ${shortDate(dates[0])}`
+        : `${summary.distributed.length} study spread ${shortDate(dates[0])}–${shortDate(dates[dates.length - 1])}`);
+  }
+  if (summary.leftInPlace.length) parts.push(`${summary.leftInPlace.length} fixed left in place`);
+  return parts.length ? `Rolled over: ${parts.join(" · ")}` : "Nothing to roll over.";
 }
 
 function undoRollover() {
@@ -1466,9 +1562,69 @@ function maybeAutoRepairRollover() {
   saveState();
 }
 
+// Categories the base generator adds as fixed daily/weekly routines.
+const BASE_ROUTINE_CATS = new Set(["ahf", "leetcode", "palana", "palana_security", "github", "mentor", "winfo", "personal"]);
+
+// Tags every task that has no `source` yet with who owns it. New tasks are
+// tagged at creation; this infers it for states saved before the field
+// existed. Only untagged tasks are touched, so it is safe to run every load.
+// Inference rules, in order:
+//   1. id contains "_x_" or planExtension:true  -> "extension"
+//      (plan-extension-2026.js namespaces every id with _x_ and sets planExtension)
+//   2. createdByChatbot, id contains "_custom_", or category "custom" -> "user"
+//      (manual add-task ids are `${date}_custom_${ts}`; the chatbot sets createdByChatbot)
+//   3. rolled-over copies (rolledFrom set) keep the owner of where they came
+//      from: rolledFrom inside the base window -> "base", later -> "extension"
+//   4. everything else was produced by app.js's generator, reflow, backfill or
+//      rollover-repair (_ahf_, _leetcode_, _msoa_, _curr_, Sec+ plan ids, …) -> "base".
+//      A "base" task dated after BASE_SCHEDULE_END is residue of the old reflow
+//      bug; repairReflowDamage() cleans those up.
+function inferTaskSources() {
+  (appState.days || []).forEach(day => {
+    (day.tasks || []).forEach(t => {
+      if (t.source) return;
+      const id = String(t.id || "");
+      if (id.includes("_x_") || t.planExtension) t.source = "extension";
+      else if (t.createdByChatbot || id.includes("_custom_") || t.category === "custom") t.source = "user";
+      else if (t.rolledFrom) t.source = t.rolledFrom <= BASE_SCHEDULE_END ? "base" : "extension";
+      else t.source = "base";
+    });
+  });
+}
+
+// One-time repair for states damaged by the old reflow, which deleted every
+// unfinished extension task after Sept 2 and stacked summer routines on
+// Sept–Dec. Removes unfinished base routines dated after the base window, then
+// re-inserts any extension task whose id is missing (additive; never changes
+// an existing task's completion).
+function repairReflowDamage() {
+  appState.settings = appState.settings || {};
+  if (appState.settings.reflowRepairV1Done) return false;
+  inferTaskSources();
+  let removed = 0;
+  appState.days.forEach(day => {
+    if (day.date <= BASE_SCHEDULE_END) return;
+    const before = day.tasks.length;
+    day.tasks = day.tasks.filter(t => !(t.source === "base" && !t.completed && !t.rolledFrom && BASE_ROUTINE_CATS.has(t.category)));
+    removed += before - day.tasks.length;
+  });
+  let inserted = 0;
+  if (typeof extendPlanThroughDec2026 === "function") {
+    inserted = extendPlanThroughDec2026({ additiveOnly: true }) || 0;
+  }
+  appState.settings.reflowRepairV1Done = true;
+  if (removed || inserted) console.log(`Reflow repair: removed ${removed} stray base routine(s), restored ${inserted} extension task(s).`);
+  return { removed, inserted };
+}
+window.repairReflowDamage = repairReflowDamage;
+
 // Reflows scheduled hours if Palana Project toggle or settings are modified.
 // Does NOT lock any days, just reflows the future curriculum.
 function reflowRemainingCurriculum() {
+  inferTaskSources();
+  const inBase = (day) => day.date <= BASE_SCHEDULE_END;
+  const isBase = (t) => t.source === "base";
+
   // Find current date or last rollover date to start reflowing
   let startReflowIndex = 0;
   if (appState.settings.lastRolloverDay) {
@@ -1478,34 +1634,38 @@ function reflowRemainingCurriculum() {
     }
   }
 
-  // Pre-calculate the correct LeetCode Blind 75 question index up to startReflowIndex.
-  // Microsoft OA override tasks do NOT advance the Blind 75 index.
-  let lcIndex = 0;
-  for (let i = 0; i < startReflowIndex; i++) {
-    const d = appState.days[i];
-    d.tasks.forEach(t => {
-      if (t.category === "leetcode" && !t.title.includes("Rolled Over") && !t.microsoftOA && !t.backfilled) {
-        lcIndex++;
-      }
-    });
-  }
+  // Blind 75 seqs held by base-window tasks that survive this reflow (before
+  // the reflow start, completed, or not base-owned). Top-ups take the lowest
+  // seq not in this set. Only the base window counts: the plan extension runs
+  // its own continuation and later review cycles through all 75, which would
+  // otherwise leave nothing for the summer. Backfilled filler holds no seq.
+  const usedSeqs = new Set();
+  appState.days.forEach((d, i) => d.tasks.forEach(t => {
+    if (t.category !== "leetcode" || !t.blind75Seq || t.backfilled || !inBase(d)) return;
+    if (i < startReflowIndex || t.completed || !isBase(t)) usedSeqs.add(t.blind75Seq);
+  }));
 
   // Snapshot the uncompleted curriculum backlog BEFORE rebuilding routines below,
   // because that rebuild clears each day's task list. (Without this, toggling
   // Palana/settings would silently wipe all PortSwigger/AWS/Sec+ tasks.)
   const curriculumBacklog = [];
   for (let i = startReflowIndex; i < appState.days.length; i++) {
+    if (!inBase(appState.days[i])) continue;
     appState.days[i].tasks.forEach(t => {
+      if (!isBase(t)) return;
       // Security+ is placed by applySecplusDailyPlan, not by capacity-based reflow.
       // Skip incomplete Sec+ tasks here so they're dropped and re-issued from the fixed plan.
       if (t.category === "secplus") return;
+      // Only curriculum tracks are backlog. A rolled task is judged by its
+      // category like any other (routines stay put, projects are rebuilt below).
       const isCurriculum = t.category === "portswigger" || t.category === "aws";
-      if (!t.completed && (isCurriculum || t.title.includes("Rolled Over"))) {
+      if (!t.completed && isCurriculum) {
         curriculumBacklog.push({
           category: t.category,
-          title: t.title.replace(" (Part A)", "").replace(" (Part B)", ""),
+          title: stripRolledSuffix(t.title).replace(" (Part A)", "").replace(" (Part B)", ""),
           duration: t.duration,
-          link: t.link
+          link: t.link,
+          exam: t.exam
         });
       }
     });
@@ -1514,37 +1674,32 @@ function reflowRemainingCurriculum() {
   // Re-generate fixed routines for days >= startReflowIndex (to apply Palana/capacity edits)
   for (let i = startReflowIndex; i < appState.days.length; i++) {
     const day = appState.days[i];
+    // Base routines are never added after the base window (rule: reflow only
+    // regenerates what generateBaseSchedule owns, where it owns it).
+    if (!inBase(day)) continue;
     
-    // Save any completed tasks first!
-    const completedTasks = day.tasks.filter(t => t.completed);
-    
-    // Clean all tasks
-    day.tasks = [];
+    // Keep completed tasks and everything the base generator doesn't own.
+    day.tasks = day.tasks.filter(t => t.completed || !isBase(t));
     
     // Update maxCapacity based on new settings
     day.maxCapacity = getBaseCapacityForDay(day.date, appState.settings.maxNormalDailyHours);
-    
-    // Restore completed tasks
-    completedTasks.forEach(ct => day.tasks.push(ct));
+    const baseHas = (pred) => day.tasks.some(t => isBase(t) && pred(t));
     
     // Re-add routines if they were not already completed
     const dayOfWeek = getDayOfWeek(day.date);
     const isIndia = day.isIndia;
-    const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
     
     // AHF — use detailed tasks when available
-    if (!day.tasks.some(t => t.category === "ahf")) {
+    if (!baseHas(t => t.category === "ahf")) {
       buildAHFTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
     
     // LeetCode — Microsoft OA prep override (Aug 11-17) uses a fixed 6-problem set;
     // otherwise, 2 Blind 75 problems per day from LEETCODE_START_2PERDAY onward.
-    const existingLc = day.tasks.filter(t => t.category === "leetcode" && !t.title.includes("Rolled Over"));
-    // Only completed Blind 75 tasks advance the sequential index — MS OA + backfilled tasks don't.
-    lcIndex += existingLc.filter(t => !t.microsoftOA && !t.backfilled).length;
+    const existingLc = day.tasks.filter(t => isBase(t) && t.category === "leetcode" && !t.rolledFrom);
     const msOaSet = (typeof MICROSOFT_OA_OVERRIDE !== "undefined") ? MICROSOFT_OA_OVERRIDE[day.date] : null;
     if (msOaSet) {
-      const existingIds = new Set(existingLc.map(t => t.leetcodeId));
+      const existingIds = new Set(existingLc.map(t => t.leetcodeNumber));
       msOaSet.forEach((p, i) => {
         if (existingIds.has(p.id)) return;
         day.tasks.push({
@@ -1554,55 +1709,66 @@ function reflowRemainingCurriculum() {
           duration: 0.75,
           completed: false,
           link: p.link,
-          leetcodeId: p.id,
+          leetcodeNumber: p.id,
           microsoftOA: true
         });
       });
     } else if (day.date >= LEETCODE_START_2PERDAY) {
       const targetCount = 2;
       const needed = targetCount - existingLc.length;
-      for (let j = 0; j < needed && lcIndex < 75; j++) {
-        const problem = BLIND_75_QUESTIONS[lcIndex % 75];
+      for (let j = 0; j < needed; j++) {
+        const problem = BLIND_75_QUESTIONS.find(q => !usedSeqs.has(q.seq));
+        if (!problem) break;
+        usedSeqs.add(problem.seq);
+        let n = 1;
+        while (day.tasks.some(t => t.id === `${day.date}_leetcode_${n}`)) n++;
         day.tasks.push({
-          id: `${day.date}_leetcode_${existingLc.length + j + 1}`,
+          id: `${day.date}_leetcode_${n}`,
           category: "leetcode",
-          title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
+          title: blind75Title(problem),
           duration: 0.5,
           completed: false,
           link: problem.link,
-          leetcodeId: problem.id
+          leetcodeNumber: problem.lc,
+          blind75Seq: problem.seq
         });
-        lcIndex++;
       }
     }
 
     // (INFO 310 course removed — tracked separately in Canvas.)
 
     // Palana prep / security (array return)
-    if (!day.tasks.some(t => t.category === "palana" || t.category === "palana_security")) {
+    if (!baseHas(t => t.category === "palana" || t.category === "palana_security")) {
       buildPalanaTaskForDay(day.date, dayOfWeek, isIndia).forEach(t => day.tasks.push(t));
     }
 
     // Git Developer Productivity Tool roadmap
     if (typeof buildGitProjectTasksForDay === "function" && day.date >= "2026-06-15") {
-      if (!day.tasks.some(t => t.category === "github")) {
+      if (!baseHas(t => t.category === "github")) {
         buildGitProjectTasksForDay(day.date, dayOfWeek, isIndia).forEach(t => day.tasks.push(t));
       }
     }
 
     // Mentor meetings (fixed recurring)
-    if (!day.tasks.some(t => t.category === "mentor")) {
+    if (!baseHas(t => t.category === "mentor")) {
       buildMentorTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
 
     // WINFO — Finance Director duties (Tuesdays)
-    if (!day.tasks.some(t => t.category === "winfo")) {
+    if (!baseHas(t => t.category === "winfo")) {
       buildWinfoTasksForDay(day.date).forEach(t => day.tasks.push(t));
     }
+
+    day.tasks.forEach(t => { if (!t.source) t.source = "base"; });
   }
 
-  // Remove overflow days (recreated during distribution if the plan runs long)
+  // Remove overflow (recreated during distribution if the plan runs long).
+  // Overflow is base-owned scratch, so this is the one place base tasks past
+  // BASE_SCHEDULE_END are removed.
   appState.days = appState.days.filter(d => !d.isOverflow);
+  appState.days.forEach(d => {
+    d.tasks = d.tasks.filter(t => !(t.overflow && isBase(t) && !t.completed));
+  });
 
   // Track which project tasks are already completed anywhere in the plan
   // so we don't re-schedule them when rebuilding the project backlog.
@@ -1610,7 +1776,7 @@ function reflowRemainingCurriculum() {
   appState.days.forEach(day => {
     day.tasks.forEach(t => {
       if (t.category === "projects" && t.completed) {
-        const clean = t.title.replace(" (Part A)", "").replace(" (Part B)", "").replace(" (Rolled Over)", "");
+        const clean = stripRolledSuffix(t.title).replace(" (Part A)", "").replace(" (Part B)", "");
         completedProjectTitles.add(clean);
       }
     });
@@ -1648,20 +1814,6 @@ function reflowRemainingCurriculum() {
 
   // Apply the fixed 30-day Security+ plan (preserves completed Sec+ tasks by planDay)
   applySecplusDailyPlan(appState.days);
-
-  // Place Security+ exam on the deadline (Sept 1) if not already there
-  const examDayReflow = appState.days.find(d => d.date === SECPLUS_EXAM_DATE);
-  if (examDayReflow && !examDayReflow.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam"))) {
-    examDayReflow.tasks.push({
-      id: `${SECPLUS_EXAM_DATE}_sec_exam`,
-      category: "secplus",
-      title: "CompTIA Security+ SY0-701 Certification Exam",
-      duration: 2.5,
-      completed: false,
-      fixed: true,
-      link: "https://www.comptia.org/certifications/security"
-    });
-  }
 
   // Save State and Render
   saveState();
@@ -1769,10 +1921,10 @@ function renderCategoryList() {
 
     row.innerHTML = `
       <div class="cat-row-summary">
-        <span class="cat-color-dot" style="background:${cat.color}"></span>
-        <span class="cat-row-icon">${cat.icon}</span>
-        <span class="cat-row-name">${cat.name}</span>
-        <span class="cat-row-meta">${cat.weeklyTarget || 0}h/wk</span>
+        <span class="cat-color-dot" style="background:${escapeHtml(cat.color)}"></span>
+        <span class="cat-row-icon">${escapeHtml(cat.icon)}</span>
+        <span class="cat-row-name">${escapeHtml(cat.name)}</span>
+        <span class="cat-row-meta">${escapeHtml(cat.weeklyTarget || 0)}h/wk</span>
         ${cat.required ? '<span class="cat-required-badge">Required</span>' : ""}
         ${cat.archived ? '<span class="cat-archived-badge">Archived</span>' : ""}
         <button class="cat-edit-toggle" title="Edit">✎</button>
@@ -1781,20 +1933,20 @@ function renderCategoryList() {
       <div class="cat-edit-inline" style="display:none">
         <div class="cat-edit-row">
           <label>Color</label>
-          <input type="color" class="cat-inline-color" value="${cat.color}">
+          <input type="color" class="cat-inline-color" value="${escapeHtml(cat.color)}">
         </div>
         <div class="cat-edit-row">
           <label>Icon</label>
-          <input type="text" class="cat-inline-icon form-input" value="${cat.icon}" maxlength="4">
+          <input type="text" class="cat-inline-icon form-input" value="${escapeHtml(cat.icon)}" maxlength="4">
         </div>
         ${!cat.builtIn ? `
         <div class="cat-edit-row">
           <label>Name</label>
-          <input type="text" class="cat-inline-name form-input" value="${cat.name}">
+          <input type="text" class="cat-inline-name form-input" value="${escapeHtml(cat.name)}">
         </div>` : ""}
         <div class="cat-edit-row">
           <label>h/wk</label>
-          <input type="number" class="cat-inline-weekly form-input" value="${cat.weeklyTarget || 0}" min="0" step="0.5">
+          <input type="number" class="cat-inline-weekly form-input" value="${escapeHtml(cat.weeklyTarget || 0)}" min="0" step="0.5">
         </div>
         <div class="cat-edit-actions">
           ${!cat.builtIn ? `<button class="cat-archive-btn">${cat.archived ? "Restore" : "Archive"}</button>` : ""}
@@ -1889,19 +2041,16 @@ function addNewCategory() {
   playSynthSound("success");
 }
 
-function archiveCategory(catId) {
-  if (!appState.categories[catId]) return;
-  appState.categories[catId].archived = !appState.categories[catId].archived;
-  saveState();
-  renderCategoryList();
-}
-
 function deleteCategory(catId) {
   if (BUILT_IN_CATEGORIES[catId]) return alert("Built-in categories cannot be deleted.");
   if (!confirm("Delete this category? Tasks will be preserved under 'custom'.")) return;
   appState.days.forEach(day => {
     day.tasks.forEach(t => { if (t.category === catId) t.category = "custom"; });
   });
+  // Extracurriculars pointing at the deleted category fall back to 'custom' too,
+  // and any saved colour/icon override for it goes with it.
+  (appState.extracurriculars || []).forEach(ec => { if (ec.categoryId === catId) ec.categoryId = "custom"; });
+  if (appState.categoryOverrides) delete appState.categoryOverrides[catId];
   delete appState.categories[catId];
   saveState();
   renderCategoryList();
@@ -1923,33 +2072,44 @@ function populateCategorySelects() {
 }
 
 // ── Task action helpers ──────────────────────────────────────────────────────
+// Returns false (and changes nothing) when the hours aren't a number.
 function markTaskPartial(task, day, completedHours) {
-  const done = Math.max(0, Math.min(task.duration, completedHours || 0));
+  if (!Number.isFinite(completedHours)) {
+    alert("Enter the hours completed as a number, e.g. 1.5. Nothing was recorded.");
+    return false;
+  }
+  const done = Math.max(0, Math.min(task.duration, completedHours));
   task.completedMinutes = Math.round(done * 60);
   task.remainingMinutes = Math.round((task.duration - done) * 60);
   task.status = done >= task.duration ? "done" : "partial";
   task.completed = done >= task.duration;
+  touchTask(task);
   if (task.completed) {
     task.completedOnDate = day.date;
     task.completedAt = new Date().toISOString();
   }
   saveState();
+  return true;
 }
 
+// Returns true if the task moved, false if it bailed out (fixed task, no next
+// day, or a full day) — callers skip re-rendering in that case.
 function moveTaskToTomorrow(task, day) {
-  if (task.fixed) return alert("Fixed meetings cannot be moved automatically.");
+  if (task.fixed) { alert("Fixed meetings cannot be moved automatically."); return false; }
   const idx = appState.days.findIndex(d => d.date === day.date);
-  if (idx === -1 || idx + 1 >= appState.days.length) return;
+  if (idx === -1 || idx + 1 >= appState.days.length) return false;
   const tomorrow = appState.days[idx + 1];
   if (tomorrow.tasks.reduce((s, t) => s + t.duration, 0) + task.duration > tomorrow.maxCapacity) {
-    return alert("Tomorrow is at capacity. Use Reschedule or Force Rollover.");
+    alert("Tomorrow is at capacity. Use Reschedule or Force Rollover.");
+    return false;
   }
   day.tasks = day.tasks.filter(t => t.id !== task.id);
   task.originalDate = task.originalDate || day.date;
   task.rescheduleCount = (task.rescheduleCount || 0) + 1;
+  touchTask(task);
   tomorrow.tasks.push(task);
   appState.rescheduleLedger = appState.rescheduleLedger || {};
-  const key = task.title.replace(" (Rolled Over)", "").trim();
+  const key = stripRolledSuffix(task.title).trim();
   const led = appState.rescheduleLedger[key] || { originalDate: task.originalDate, count: 0 };
   led.count++; led.lastMovedFrom = day.date; led.movedOn = planToday();
   appState.rescheduleLedger[key] = led;
@@ -1957,17 +2117,35 @@ function moveTaskToTomorrow(task, day) {
   renderDashboardMetrics();
   renderCalendarDays();
   showDayDetails(tomorrow.date);
+  return true;
+}
+
+// Moves a task between days. The id never changes, so notes keyed by id
+// (appState.taskNotes) follow the task.
+function moveTaskToDate(task, fromDate, toDate) {
+  if (!task || fromDate === toDate) return false;
+  const fromDay = appState.days.find(d => d.date === fromDate);
+  const toDay = appState.days.find(d => d.date === toDate);
+  if (!fromDay || !toDay) return false;
+  fromDay.tasks = fromDay.tasks.filter(t => t.id !== task.id);
+  task.originalDate = task.originalDate || fromDate;
+  task.rescheduleCount = (task.rescheduleCount || 0) + 1;
+  touchTask(task);
+  toDay.tasks.push(task);
+  return true;
 }
 
 function skipTask(task, day) {
   task.status = "skipped";
   task.completed = false;
+  touchTask(task);
   saveState();
   showDayDetails(day.date);
 }
 
 function blockTask(task, day) {
   task.status = "blocked";
+  touchTask(task);
   saveState();
   showDayDetails(day.date);
 }
@@ -1996,9 +2174,9 @@ function renderTodaySection() {
       ${pending.length === 0 ? '<p class="today-all-done">All tasks complete for today! 🎉</p>' :
         pending.map(t => {
           const cat = getCategoryDef(t.category);
-          return `<div class="today-task-row cat-${t.category}" onclick="showDayDetails('${today}')">
-            <span class="today-cat-badge" style="border-color:${cat.color}">${cat.icon} ${cat.name || t.category}</span>
-            <span class="today-task-title">${t.title}</span>
+          return `<div class="today-task-row cat-${escapeHtml(t.category)}" onclick="showDayDetails('${today}')">
+            <span class="today-cat-badge" style="border-color:${escapeHtml(cat.color)}">${escapeHtml(cat.icon)} ${escapeHtml(cat.name || t.category)}</span>
+            <span class="today-task-title">${escapeHtml(t.title)}</span>
             <span class="today-task-dur">${t.duration}h</span>
             ${taskHasNotes(t.id) ? '<span class="notes-dot">📝</span>' : ''}
             ${t.milestone ? '<span class="milestone-badge">◆ Milestone</span>' : ''}
@@ -2025,30 +2203,30 @@ function renderExtracurricularSummary() {
   }
   
   container.innerHTML = appState.extracurriculars.map((ec, idx) => {
-    const categoryDef = BUILT_IN_CATEGORIES[ec.categoryId];
-    const icon = categoryDef ? categoryDef.icon : "✨";
-    const color = categoryDef ? categoryDef.color : "#ffffff";
+    const categoryDef = getCategoryDef(ec.categoryId); // includes custom categories
+    const icon = categoryDef.icon || "✨";
+    const color = categoryDef.color || "#ffffff";
     
     return `
-      <div class="extracurricular-card" style="border-left: 4px solid ${color}">
+      <div class="extracurricular-card" style="border-left: 4px solid ${escapeHtml(color)}">
         <div class="extracurricular-header">
-          <span class="extracurricular-icon">${icon}</span>
+          <span class="extracurricular-icon">${escapeHtml(icon)}</span>
           <div class="extracurricular-titles">
-            <div class="extracurricular-name">${ec.name}</div>
-            <div class="extracurricular-role">${ec.role}</div>
+            <div class="extracurricular-name">${escapeHtml(ec.name)}</div>
+            <div class="extracurricular-role">${escapeHtml(ec.role)}</div>
           </div>
-          <span class="extracurricular-status ${ec.status}">${ec.status.replace("-", " ")}</span>
+          <span class="extracurricular-status ${escapeHtml(ec.status)}">${escapeHtml(ec.status.replace("-", " "))}</span>
         </div>
         <div class="extracurricular-details">
           <div class="detail-row">
             <span class="detail-label">Weekly Hours:</span>
-            <span class="detail-value">${ec.weeklyHours}h</span>
+            <span class="detail-value">${escapeHtml(ec.weeklyHours)}h</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Next Event:</span>
-            <span class="detail-value">${ec.nextEvent}</span>
+            <span class="detail-value">${escapeHtml(ec.nextEvent)}</span>
           </div>
-          ${ec.notes ? `<div class="detail-row"><span class="detail-value notes">${ec.notes}</span></div>` : ''}
+          ${ec.notes ? `<div class="detail-row"><span class="detail-value notes">${escapeHtml(ec.notes)}</span></div>` : ''}
         </div>
         <div class="extracurricular-actions">
           <button class="action-btn edit-btn" onclick="editExtracurricular(${idx})">Edit</button>
@@ -2062,7 +2240,6 @@ function renderExtracurricularSummary() {
 function editExtracurricular(idx) {
   const ec = appState.extracurriculars[idx];
   const modal = document.getElementById("extracurricular-modal");
-  const form = document.getElementById("extracurricular-form");
   
   document.getElementById("ec-name").value = ec.name;
   document.getElementById("ec-role").value = ec.role;
@@ -2144,6 +2321,8 @@ const BACKFILL_END = "2026-07-31";
 function backfillJuneJulyCompleted(force) {
   appState.settings = appState.settings || {};
   if (!force && appState.settings.backfillJuneJulyV2Done) return;
+  // Owner-history only: a fresh or reset plan starts with nothing checked.
+  if (isFreshState()) { appState.settings.backfillJuneJulyV2Done = true; return; }
   if (!Array.isArray(appState.days) || appState.days.length === 0) return;
   if (typeof BLIND_75_QUESTIONS === "undefined") return;
 
@@ -2181,7 +2360,8 @@ function backfillJuneJulyCompleted(force) {
         duration: 1.0,
         completed: false,
         link: null,
-        backfilled: true
+        backfilled: true,
+        source: "base"
       });
     }
   });
@@ -2198,22 +2378,24 @@ function backfillJuneJulyCompleted(force) {
       day.tasks.push({
         id: `${day.date}_leetcode_backfill_${k + 1}`,
         category: "leetcode",
-        title: `LeetCode Blind 75: #${problem.id} - ${problem.name}`,
+        title: blind75Title(problem),
         duration: 0.5,
         completed: false,
         link: problem.link,
-        leetcodeId: problem.id,
-        backfilled: true
+        leetcodeNumber: problem.lc,
+        blind75Seq: problem.seq,
+        backfilled: true,
+        source: "base"
       });
     }
   });
 
   // 3. Mark every task in the window as completed — but skip exam tasks so cert
   //    badges (AWS / Sec+) stay untouched.
-  const isExamTask = (t) => /Certification Exam/i.test(t.title || "");
+  const isExamTitle = (t) => /Certification Exam/i.test(t.title || "");
   window.forEach(day => {
     day.tasks.forEach(t => {
-      if (t.completed || isExamTask(t)) return;
+      if (t.completed || isExamTitle(t) || isExamTask(t)) return;
       t.completed = true;
       t.completedOnDate = day.date;
       t.completedAt = nowIso;
@@ -2272,6 +2454,26 @@ window.unmarkExamTasksIfBackfilled = unmarkExamTasksIfBackfilled;
 window.backfillJuneJulyCompleted = backfillJuneJulyCompleted;
 
 let _saveTimer = null;
+// Stamp a task as changed now. Call on every task mutation — task.updatedAt is
+// what decides which device's version wins a merge (see js/sync-core.js).
+// saveState() also stamps any changed task that was missed, as a safety net.
+function touchTask(task) {
+  if (task) task.updatedAt = Date.now();
+  return task;
+}
+
+// Content snapshot of the last save, used to (a) stamp tasks that changed and
+// record deletions, and (b) bump appState.meta.updatedAt only when something
+// really changed — so a load-then-save with no edits doesn't look like a new
+// edit to the merge rule.
+let _taskFingerprints = null;
+let _lastLocalPieces = null;
+function resetTaskFingerprints() {
+  if (typeof SyncCore === "undefined" || !appState) return;
+  _taskFingerprints = SyncCore.withStamps(SyncCore.fingerprintTasks(appState), appState);
+  _lastLocalPieces = SyncCore.split(appState);
+}
+
 function saveState() {
   // Write to localStorage immediately so nothing is lost. Strip the transient
   // undo snapshot first — it's a full copy of every day and would roughly
@@ -2279,9 +2481,20 @@ function saveState() {
   // While the sign-in gate is up we don't know whose progress this is yet, so
   // nothing gets written to disk. Boot-time migrations that run before auth
   // resolves simply re-run on the next load, which is harmless.
-  if (document.body && document.body.classList.contains("app-locked")) return;
+  if (!stateReady) return;
+  if (typeof SyncCore !== "undefined") {
+    const now = Date.now();
+    SyncCore.capArchive(appState);
+    _taskFingerprints = SyncCore.stampTaskChanges(appState, _taskFingerprints, now);
+    const pieces = SyncCore.split(appState);
+    if (!appState.meta || SyncCore.contentDiffers(pieces, _lastLocalPieces)) {
+      appState.meta = { updatedAt: now, deviceId: SyncCore.getDeviceId(localStorage) };
+    }
+    _lastLocalPieces = pieces;
+  }
   const { rolloverUndoSnapshot, ...persistable } = appState;
   localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(persistable));
+  if (typeof currentUser !== "undefined" && currentUser && typeof setSyncStatus === "function") setSyncStatus("saving");
   // Debounce Firestore writes — collapse rapid saves into one network call
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(() => {
@@ -2302,12 +2515,7 @@ function loadState() {
       }
       // ⭐ NEW: Migrate from simulated today to real today
       migrateToRealCurrentDate();
-      // Re-apply any saved color/icon overrides for built-in categories
-      if (appState.categoryOverrides) {
-        Object.entries(appState.categoryOverrides).forEach(([id, ov]) => {
-          if (BUILT_IN_CATEGORIES[id]) Object.assign(BUILT_IN_CATEGORIES[id], ov);
-        });
-      }
+      resetTaskFingerprints();
     } catch (e) {
       console.error("Failed to parse state, generating new.", e);
       generateNewState();
@@ -2317,7 +2525,150 @@ function loadState() {
   }
 }
 
+function blind75Title(q) { return `LeetCode #${q.lc} - ${q.name}`; }
+
+// Which Blind 75 problem a task covers: its own blind75Seq, or — for OA and
+// other tasks — the list entry with the same real LeetCode number.
+function blind75SeqOf(t) {
+  if (!t || t.category !== "leetcode") return null;
+  if (t.blind75Seq) return t.blind75Seq;
+  const q = t.leetcodeNumber != null ? BLIND_75_BY_LC[t.leetcodeNumber] : null;
+  return q ? q.seq : null;
+}
+
+function countBlind75Solved(days) {
+  const seqs = new Set();
+  (days || []).forEach(d => (d.tasks || []).forEach(t => {
+    if (t.completed) { const s = blind75SeqOf(t); if (s) seqs.add(s); }
+  }));
+  return seqs.size;
+}
+
+// Real LeetCode numbers of the OLD blind75.js list, indexed by its old id - 1.
+// Saved Blind 75 tasks stored that old id in leetcodeId. Ids 12 (dup 3Sum),
+// 25 (142), 39 (215), 58 (377) and 64 (337) are not in the canonical list, so
+// they get a leetcodeNumber but no blind75Seq.
+const LEGACY_BLIND75_LC = [
+  1, 121, 217, 238, 53, 152, 153, 33, 15, 11,
+  125, 15, 3, 424, 76, 242, 49, 20, 141, 206,
+  21, 143, 19, 23, 142, 226, 104, 100, 572, 235,
+  102, 98, 230, 105, 124, 297, 295, 347, 215, 39,
+  79, 133, 207, 200, 417, 261, 323, 128, 269, 73,
+  54, 48, 70, 322, 300, 1143, 139, 377, 198, 213,
+  91, 62, 55, 337, 57, 56, 435, 252, 253, 371,
+  191, 338, 190, 268, 271
+];
+
+// One-time: leetcodeId (old list position for Blind 75 tasks, real number for
+// Microsoft OA tasks) -> leetcodeNumber (+ blind75Seq for Blind 75 tasks).
+// Completion is untouched; the schedule is not regenerated. Rolled-over copies
+// lost leetcodeId, so their old-format title "LeetCode Blind 75: #<oldId> - …"
+// is used instead. Only tasks without leetcodeNumber are touched.
+function migrateLeetcodeNumbers() {
+  appState.settings = appState.settings || {};
+  if (appState.settings.leetcodeNumbersV1Done) return false;
+  const oldTitle = /^LeetCode Blind 75: #(\d+) - [^(]*?( \(.*)?$/;
+  (appState.days || []).forEach(day => (day.tasks || []).forEach(t => {
+    if (t.category !== "leetcode" || t.leetcodeNumber != null) return;
+    const m = typeof t.title === "string" ? t.title.match(oldTitle) : null;
+    const oldId = t.leetcodeId != null ? t.leetcodeId : (m ? +m[1] : null);
+    if (oldId == null || oldId === 0) { delete t.leetcodeId; return; }
+    const lc = t.microsoftOA ? oldId : LEGACY_BLIND75_LC[oldId - 1];
+    if (lc == null) return;
+    t.leetcodeNumber = lc;
+    const q = BLIND_75_BY_LC[lc];
+    if (q && !t.microsoftOA) t.blind75Seq = q.seq;
+    if (m) {
+      const name = q ? q.name : t.title.split(" - ").slice(1).join(" - ").replace(/ \(.*$/, "");
+      t.title = `LeetCode #${lc} - ${name}${m[2] || ""}`;
+    }
+    delete t.leetcodeId;
+  }));
+  appState.settings.leetcodeNumbersV1Done = true;
+  return true;
+}
+
+// One-time: rolled tasks and exams are identified by fields, not title text.
+//   - " (Rolled Over)" is stripped from titles; those tasks get `rolledFrom`.
+//   - Existing task ids are left exactly as they are (ids are no longer
+//     rewritten on move, so notes keyed by id stay attached from now on).
+//   - Certification exam tasks get `exam: true` (title match, this once only).
+//   - The retired base-plan Sec+ exam on Sept 1 is removed if uncompleted; a
+//     completed one is kept and noted in the console.
+//   - Sept 1-2 sit between the August auto-complete and the Sept 3-15 backfill,
+//     so their base tasks were never checked. Once past, they are marked
+//     complete the same way (exams excluded).
+const SEPT_GAP_DATES = ["2026-09-01", "2026-09-02"];
+function migrateRolloverAndExamsV1() {
+  appState.settings = appState.settings || {};
+  if (appState.settings.rolloverExamsV1Done) return false;
+  const nowIso = new Date().toISOString();
+  const today = getRealCurrentDate();
+  const EXAM_CATS = new Set(["aws", "secplus", "awscp"]);
+
+  (appState.days || []).forEach(day => {
+    day.tasks = (day.tasks || []).filter(t => {
+      if (typeof t.title === "string" && / \(Rolled Over\)/.test(t.title)) {
+        t.title = stripRolledSuffix(t.title);
+        if (!t.rolledFrom) t.rolledFrom = t.originalDate || day.date;
+      }
+      if (EXAM_CATS.has(t.category) && /Certification Exam/i.test(t.title || "")) t.exam = true;
+
+      const retiredExam = day.date === SECPLUS_EXAM_DATE && t.category === "secplus" &&
+        t.source !== "extension" && (t.id === `${SECPLUS_EXAM_DATE}_sec_exam` || t.exam);
+      if (retiredExam) {
+        if (!t.completed) return false;
+        console.log(`Kept the completed Sept 1 Security+ exam task (${t.id}); the scheduled exam is 2026-09-18.`);
+      }
+      return true;
+    });
+
+    if (SEPT_GAP_DATES.includes(day.date) && day.date < today && !isFreshState()) {
+      day.tasks.forEach(t => {
+        if (t.completed || isExamTask(t)) return;
+        t.completed = true;
+        t.completedOnDate = day.date;
+        t.completedAt = nowIso;
+        t.status = "done";
+        t.completedMinutes = Math.round((t.duration || 0) * 60);
+        t.remainingMinutes = 0;
+      });
+    }
+  });
+
+  appState.settings.rolloverExamsV1Done = true;
+  return true;
+}
+
+// Every load path (local boot, cloud load, reset) funnels through here. Each
+// step is idempotent, so running it on an already-migrated state is a no-op.
+let _builtInCategoryDefaults = null;
+function runStatePipeline() {
+  // Snapshot built-in categories before any saved overrides touch them, so a
+  // reset can restore them.
+  if (!_builtInCategoryDefaults) _builtInCategoryDefaults = JSON.parse(JSON.stringify(BUILT_IN_CATEGORIES));
+  inferTaskSources();
+  migrateLeetcodeNumbers();
+  if (appState.categoryOverrides) {
+    Object.entries(appState.categoryOverrides).forEach(([id, ov]) => {
+      if (BUILT_IN_CATEGORIES[id]) Object.assign(BUILT_IN_CATEGORIES[id], ov);
+    });
+  }
+  migrateScheduleIfNeeded();
+  maybeAutoRepairRollover();
+  backfillJuneJulyCompleted();
+  unmarkExamTasksIfBackfilled();
+  if (typeof extendPlanThroughDec2026 === "function") extendPlanThroughDec2026();
+  repairReflowDamage();
+  migrateRolloverAndExamsV1();
+  if (typeof migrateExtensionFlex === "function") migrateExtensionFlex();
+  if (typeof rebalanceCapacity === "function") rebalanceCapacity();
+  inferTaskSources();
+  applyCategoryColors();
+}
+
 function generateNewState() {
+  appState.settings = Object.assign(defaultSettings(), { lastRolloverDay: null });
   generateBaseSchedule();
   saveState();
 }
@@ -2358,25 +2709,48 @@ function migrateScheduleIfNeeded() {
   if (!appState.taskNotes) appState.taskNotes = {};
 
   appState.settings.scheduleVersion = SCHEDULE_VERSION;
-  appState.settings.palanaSecurityEnabled = appState.settings.palanaSecurityEnabled || false;
+  appState.settings.palanaSecurityEnabled = appState.settings.palanaSecurityEnabled !== false;
   appState.settings.ahfWeeklyTarget = appState.settings.ahfWeeklyTarget || 7;
   migrateToRealCurrentDate();
   reflowRemainingCurriculum();
   return true;
 }
 
+// Full reset (the caller shows the confirm dialog first). Everything the user
+// built up goes: categories, notes, extracurriculars, reschedule ledger,
+// archive, chatbot projects/undo log, and every one-time migration flag (they
+// live in settings, which is replaced wholesale). Only sync bookkeeping is
+// kept (meta, deletedTaskIds), so the reset propagates to other devices
+// instead of being merged away. Then the plan is rebuilt through the same
+// pipeline every load uses.
 function resetPlannerState() {
-  localStorage.removeItem("cyber_study_plan_state_2026");
-  appState.settings = {
-    maxNormalDailyHours: 8,
-    palanaEnabled: true,
-    awsExamPassed: false,
-    securityPlusExamPassed: false,
-    selectedProjects: ["password_manager", "packet_analyzer", "vulnerability_scanner"],
-    lastRolloverDay: null,
-    scheduleVersion: SCHEDULE_VERSION
-  };
-  generateNewState();
+  const keep = { meta: appState.meta, deletedTaskIds: appState.deletedTaskIds };
+  Object.keys(appState).forEach(k => { delete appState[k]; });
+  Object.assign(appState, {
+    settings: defaultSettings(),
+    days: [],
+    categories: {},
+    extracurriculars: [],
+    rescheduleLedger: {},
+    taskNotes: {},
+    archivedTasks: []
+  });
+  if (keep.meta) appState.meta = keep.meta;
+  if (keep.deletedTaskIds) appState.deletedTaskIds = keep.deletedTaskIds;
+
+  // Undo in-memory side effects of the old state.
+  if (_builtInCategoryDefaults) {
+    Object.keys(BUILT_IN_CATEGORIES).forEach(id => {
+      if (_builtInCategoryDefaults[id]) BUILT_IN_CATEGORIES[id] = JSON.parse(JSON.stringify(_builtInCategoryDefaults[id]));
+    });
+  }
+  for (let i = TRACK_4_PROJECTS.length - 1; i >= 0; i--) {
+    if (TRACK_4_PROJECTS[i].createdByChatbot) TRACK_4_PROJECTS.splice(i, 1);
+  }
+
+  generateBaseSchedule();
+  runStatePipeline();
+  saveState();
   initUI();
   playSynthSound("reset");
 }
@@ -2533,10 +2907,11 @@ function renderDashboardMetrics() {
         portswiggerDone++;
       }
       
-      // Leetcode specific — distinct Blind 75 problem ids only, so repeat
-      // practice of the same problem doesn't push the counter past 75.
-      if (t.category === "leetcode" && t.completed && t.leetcodeId) {
-        leetCodeSolvedIds.add(t.leetcodeId);
+      // Distinct Blind 75 problems only (see blind75SeqOf), so repeat practice
+      // doesn't push the counter past 75 and OA-only problems don't count.
+      if (t.category === "leetcode" && t.completed) {
+        const seq = blind75SeqOf(t);
+        if (seq) leetCodeSolvedIds.add(seq);
       }
       
       // Sec+ study logged hours
@@ -2613,7 +2988,7 @@ function renderDashboardMetrics() {
     awsBadge.className = "cert-badge status-passed";
   } else {
     // Check if exam task is checked
-    const awsExamTaskCompleted = appState.days.some(d => d.tasks.some(t => t.category === "aws" && t.title.includes("Certification Exam") && t.completed));
+    const awsExamTaskCompleted = appState.days.some(d => d.tasks.some(t => t.category === "aws" && isExamTask(t) && t.completed));
     if (awsExamTaskCompleted) {
       awsBadge.innerText = "PASSED ✅";
       awsBadge.className = "cert-badge status-passed";
@@ -2635,7 +3010,7 @@ function renderDashboardMetrics() {
     secPlusBadge.innerText = "PASSED ✅";
     secPlusBadge.className = "cert-badge status-passed";
   } else {
-    const secExamTaskCompleted = appState.days.some(d => d.tasks.some(t => t.category === "secplus" && t.title.includes("Certification Exam") && t.completed));
+    const secExamTaskCompleted = appState.days.some(d => d.tasks.some(t => t.category === "secplus" && isExamTask(t) && t.completed));
     if (secExamTaskCompleted) {
       secPlusBadge.innerText = "PASSED ✅";
       secPlusBadge.className = "cert-badge status-passed";
@@ -2654,7 +3029,8 @@ function renderDashboardMetrics() {
   // AWS Cloud Practitioner badge (separate cert from the AI Practitioner one)
   const awsCpBadge = document.getElementById("badge-awscp");
   if (awsCpBadge) {
-    const cpExamDone = appState.days.some(d => d.tasks.some(t => t.category === "awscp" && /Certification Exam/i.test(t.title || "") && t.completed));
+    const cpExamDone = !!appState.settings.awscpExamPassed ||
+      appState.days.some(d => d.tasks.some(t => t.category === "awscp" && isExamTask(t) && t.completed));
     const someCpDone = appState.days.some(d => d.tasks.some(t => t.category === "awscp" && t.completed));
     if (cpExamDone) {
       awsCpBadge.innerText = "PASSED ✅";
@@ -2671,6 +3047,7 @@ function renderDashboardMetrics() {
   // Bind settings modal checkboxes to state
   document.getElementById("settings-aws-passed").checked = appState.settings.awsExamPassed;
   document.getElementById("settings-secplus-passed").checked = appState.settings.securityPlusExamPassed;
+  document.getElementById("settings-awscp-passed").checked = !!appState.settings.awscpExamPassed;
   document.getElementById("palana-toggle").checked = appState.settings.palanaEnabled;
   document.getElementById("settings-palana-toggle").checked = appState.settings.palanaEnabled;
 }
@@ -2705,17 +3082,17 @@ function renderProjectSelector() {
       card.innerHTML = `
         <button class="dated-project-head" type="button">
           <span class="dated-project-caret">${isOpen ? '▾' : '▸'}</span>
-          <span class="dated-project-name">${proj.name}</span>
-          <span class="dated-project-due ${isOverdue ? 'due-overdue' : ''}">Due ${dueLabel}</span>
+          <span class="dated-project-name">${escapeHtml(proj.name)}</span>
+          <span class="dated-project-due ${isOverdue ? 'due-overdue' : ''}">Due ${escapeHtml(dueLabel)}</span>
         </button>
         <div class="dated-project-progress">
           <div class="dated-project-bar"><div class="dated-project-fill" style="width:${prog.pct}%"></div></div>
           <span class="dated-project-pct">${prog.done}/${prog.total} · ${prog.pct}%</span>
         </div>
         <div class="dated-project-body" ${isOpen ? '' : 'hidden'}>
-          <p class="dated-project-desc">${proj.desc}</p>
+          <p class="dated-project-desc">${escapeHtml(proj.desc)}</p>
           <ul class="dated-project-subtasks">
-            ${proj.tasks.map(t => `<li><span class="sub-bullet">▫</span>${t.name}<span class="sub-hours">${t.duration}h</span></li>`).join("")}
+            ${proj.tasks.map(t => `<li><span class="sub-bullet">▫</span>${escapeHtml(t.name)}<span class="sub-hours">${escapeHtml(t.duration)}h</span></li>`).join("")}
           </ul>
         </div>
       `;
@@ -2743,10 +3120,10 @@ function renderProjectSelector() {
     const label = document.createElement("label");
     label.className = "checkbox-container";
     label.innerHTML = `
-      <input type="checkbox" value="${proj.id}" ${isSelected ? 'checked' : ''}>
+      <input type="checkbox" value="${escapeHtml(proj.id)}" ${isSelected ? 'checked' : ''}>
       <span class="custom-checkbox"></span>
-      ${proj.name}
-      <span class="proj-meta">${proj.totalHours} hrs • 1-2 weeks</span>
+      ${escapeHtml(proj.name)}
+      <span class="proj-meta">${escapeHtml(proj.totalHours)} hrs • 1-2 weeks</span>
     `;
     
     // Listen for change
@@ -2815,20 +3192,25 @@ function renderCalendarDays() {
     container.appendChild(emptyCell);
   }
   
+  // Look these up once per render, not once per cell.
+  const realTodayDate = getRealCurrentDate();
+  const planTodayDate = planToday();
+  const getHeavyReason = (typeof heavyDayReason === "function") ? heavyDayReason : () => null;
+
   monthDays.forEach(day => {
     const dayCell = document.createElement("div");
     dayCell.className = "day-cell";
     
-    const realTodayDate = getRealCurrentDate();
     const isToday = realTodayDate === day.date;
     if (isToday) dayCell.classList.add("today-cell");
-    if (isPlanPast(day.date)) dayCell.classList.add("past-day");
-    if (isPlanFuture(day.date)) dayCell.classList.add("future-day");
+    if (day.date < planTodayDate) dayCell.classList.add("past-day");
+    if (day.date > planTodayDate) dayCell.classList.add("future-day");
     if (day.isIndia) dayCell.classList.add("travel-day");
     
-    if (typeof heavyDayReason === "function" && heavyDayReason(day.date)) {
+    const heavyReason = getHeavyReason(day.date);
+    if (heavyReason) {
       dayCell.classList.add("heavy-day-cell");
-      dayCell.title = `HEAVY DAY — ${heavyDayReason(day.date)}`;
+      dayCell.title = `HEAVY DAY — ${heavyReason}`;
     }
 
     // Retired tracks stay in the data but stop rendering on the calendar.
@@ -2847,7 +3229,7 @@ function renderCalendarDays() {
 
     // Check if there are uncompleted tasks in the past
     // E.g. warning icon on cell
-    const isPast = isPlanPast(day.date);
+    const isPast = day.date < planTodayDate;
     const hasUnfinishedPast = isPast && cellTasks.some(t => !t.completed && !t.fixed);
     
     const warningIconHtml = hasUnfinishedPast ? 
@@ -2868,7 +3250,7 @@ function renderCalendarDays() {
         <!-- Dynamically filled with task tokens -->
       </div>
       ${warningIconHtml}
-      ${(typeof heavyDayReason === "function" && heavyDayReason(day.date)) ? '<span class="cell-heavy-icon" title="Heavy day — two commitments collide">🔥</span>' : ''}
+      ${heavyReason ? '<span class="cell-heavy-icon" title="Heavy day — two commitments collide">🔥</span>' : ''}
     `;
     
     // Add colored task blocks
@@ -2895,14 +3277,7 @@ function renderCalendarDays() {
       e.preventDefault();
       dayCell.classList.remove("drag-over");
       const { task, fromDate } = window._dragTask || {};
-      if (!task || fromDate === day.date) return;
-      const fromDay = appState.days.find(d => d.date === fromDate);
-      if (!fromDay) return;
-      fromDay.tasks = fromDay.tasks.filter(t => t.id !== task.id);
-      task.originalDate = task.originalDate || fromDate;
-      task.rescheduleCount = (task.rescheduleCount || 0) + 1;
-      task.id = `${day.date}_moved_${Date.now()}_${task.category}`;
-      day.tasks.push(task);
+      if (!moveTaskToDate(task, fromDate, day.date)) return;
       saveState();
       renderDashboardMetrics();
       renderCalendarDays();
@@ -2997,20 +3372,20 @@ function showDayDetails(dateStr) {
         document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
       });
       
-      const linkHtml = task.link ? 
-        `<a href="${task.link}" target="_blank" class="task-link-arrow" title="View Reference Link">&rarr;</a>` : '';
+      const linkHtml = task.link ?
+        `<a href="${escapeHtml(safeUrl(task.link))}" target="_blank" class="task-link-arrow" title="View Reference Link">&rarr;</a>` : '';
 
       const isCustom = task.category === "custom";
       const deleteHtml = isCustom
         ? `<button class="task-delete-btn" title="Delete task">✕</button>`
         : '';
       
-      const taskNotes = getTaskNotes(task.id);
       const hasNotes = taskHasNotes(task.id);
       const notesIndicator = hasNotes ? `<span class="task-notes-indicator" title="Has notes">📝</span>` : '';
       const notesBtn = `<button class="task-notes-btn" title="Edit notes">📝</button>`;
-      const statusBadge = task.status && task.status !== "done" ? `<span class="task-status-badge status-${task.status}">${task.status}</span>` : '';
+      const statusBadge = task.status && task.status !== "done" ? `<span class="task-status-badge status-${escapeHtml(task.status)}">${escapeHtml(task.status)}</span>` : '';
       const milestoneBadge = task.milestone ? `<span class="task-milestone-badge" title="Deadline / milestone">◆ MILESTONE</span>` : '';
+      const rolledBadge = task.rolledFrom ? `<span class="task-rolled-badge" title="Rolled over from ${escapeHtml(task.rolledFrom)}">↻ rolled</span>` : '';
       const subs = Array.isArray(task.subtasks) ? task.subtasks : [];
       const subDone = subs.filter(st => st.completed).length;
       const subtasksHtml = subs.length ? `
@@ -3020,10 +3395,10 @@ function showDayDetails(dateStr) {
             <label class="task-subtask-row ${st.completed ? 'subtask-checked' : ''}">
               <input type="checkbox" class="task-subtask-cb" data-sub-index="${si}" ${st.completed ? 'checked' : ''}>
               <span class="custom-checkbox custom-checkbox-sm"></span>
-              <span class="task-subtask-label">${st.title}</span>
+              <span class="task-subtask-label">${escapeHtml(st.title)}</span>
             </label>`).join("")}
         </div>` : '';
-      const ownerBadge = task.owner ? `<span class="owner-badge owner-${task.owner}">${task.owner === "shared" ? "Shared" : task.owner === "tejaswi" ? "Tejaswi" : "Thanishka"}</span>` : '';
+      const ownerBadge = task.owner ? `<span class="owner-badge owner-${escapeHtml(task.owner)}">${task.owner === "shared" ? "Shared" : task.owner === "tejaswi" ? "Tejaswi" : "Thanishka"}</span>` : '';
       const actionsHtml = task.completed ? '' : `
         <div class="task-actions-row">
           <button class="task-action-btn" data-action="partial" title="Partial completion">Partial</button>
@@ -3038,9 +3413,9 @@ function showDayDetails(dateStr) {
           <span class="custom-checkbox"></span>
         </label>
         <div class="task-details">
-          <span class="task-label">${task.title}${milestoneBadge}${notesIndicator}${statusBadge}${ownerBadge}</span>
+          <span class="task-label">${escapeHtml(task.title)}${milestoneBadge}${rolledBadge}${notesIndicator}${statusBadge}${ownerBadge}</span>
           <div class="task-sub-meta">
-            <span class="task-cat-badge badge-${task.category}">${getCategoryLabel(task.category)}</span>
+            <span class="task-cat-badge badge-${escapeHtml(task.category)}">${escapeHtml(getCategoryLabel(task.category))}</span>
             <span>Est: ${task.duration} hr${task.duration > 1 ? 's' : ''}${task.completedMinutes ? ` · ${(task.completedMinutes/60).toFixed(1)}h done` : ''}</span>
           </div>
           ${subtasksHtml}
@@ -3063,11 +3438,14 @@ function showDayDetails(dateStr) {
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
             const action = btn.getAttribute("data-action");
+            // Each helper reports whether it changed anything; if not (cancelled
+            // prompt, bad number, fixed/full day) leave the drawer exactly as it is.
             if (action === "partial") {
               const hrs = prompt(`How many hours completed? (of ${task.duration}h)`, String((task.completedMinutes || 0) / 60 || task.duration / 2));
-              if (hrs != null) markTaskPartial(task, day, parseFloat(hrs));
-            } else if (action === "tomorrow") moveTaskToTomorrow(task, day);
-            else if (action === "skip") skipTask(task, day);
+              if (hrs == null || !markTaskPartial(task, day, parseFloat(hrs))) return;
+            } else if (action === "tomorrow") {
+              if (!moveTaskToTomorrow(task, day)) return;
+            } else if (action === "skip") skipTask(task, day);
             else if (action === "blocked") blockTask(task, day);
             showDayDetails(dateStr);
             renderTodaySection();
@@ -3097,6 +3475,7 @@ function showDayDetails(dateStr) {
           const si = parseInt(subCb.getAttribute("data-sub-index"), 10);
           if (!task.subtasks || !task.subtasks[si]) return;
           task.subtasks[si].completed = subCb.checked;
+          touchTask(task);
           const allSubsDone = task.subtasks.every(st => st.completed);
           if (allSubsDone && !task.completed) {
             task.completed = true;
@@ -3123,6 +3502,7 @@ function showDayDetails(dateStr) {
       const cb = itemRow.querySelector('input');
       cb.addEventListener('change', (e) => {
         task.completed = e.target.checked;
+        touchTask(task);
         if (Array.isArray(task.subtasks)) {
           task.subtasks.forEach(st => { st.completed = task.completed; });
         }
@@ -3186,10 +3566,11 @@ function showDayDetails(dateStr) {
       title: title,
       duration: duration,
       completed: false,
-      link: null
+      link: null,
+      source: "user"
     };
 
-    day.tasks.push(newTask);
+    day.tasks.push(touchTask(newTask));
     saveState();
     playSynthSound("success");
     titleInput.value = "";
@@ -3268,14 +3649,14 @@ function renderTracksChecklists() {
         const row = document.createElement("div");
         row.className = `track-item-row comp-${track} ${ut.completed ? 'task-checked' : ''}`;
         
-        const linkHtml = ut.link ? ` (<a href="${ut.link}" target="_blank">Link</a>)` : '';
+        const linkHtml = ut.link ? ` (<a href="${escapeHtml(safeUrl(ut.link))}" target="_blank">Link</a>)` : '';
         const dateParts = ut.originalDay.split('-');
         const displayDate = `${dateParts[1]}/${dateParts[2]}`;
-        
+
         row.innerHTML = `
           <span style="color:${ut.completed ? 'var(--neon-green)' : 'var(--text-muted)'}">${ut.completed ? '✅' : '⚙️'}</span>
-          <span style="flex-grow:1">${ut.title}${linkHtml}</span>
-          <span style="font-size:0.65rem; color:var(--text-muted); font-family:var(--font-mono)">Sched: ${displayDate}</span>
+          <span style="flex-grow:1">${escapeHtml(ut.title)}${linkHtml}</span>
+          <span style="font-size:0.65rem; color:var(--text-muted); font-family:var(--font-mono)">Sched: ${escapeHtml(displayDate)}</span>
         `;
         listContainer.appendChild(row);
       });
@@ -3285,7 +3666,7 @@ function renderTracksChecklists() {
 
 // Flashes UI alert warning if we scheduled past September 1st
 function updateRiskBanner() {
-  const atRisk = appState.days.some(d => d.isOverflow);
+  const atRisk = appState.days.some(d => d.isOverflow || d.tasks.some(t => t.overflow && !t.completed));
   const warningBanner = document.getElementById("at-risk-warning");
   if (atRisk) {
     warningBanner.classList.remove("hidden");
@@ -3348,22 +3729,16 @@ window.getAllCategories = getAllCategories;
 window.getCategoryLabel = getCategoryLabel;
 window.openCategoryManager = openCategoryManager;
 window.addNewCategory = addNewCategory;
-window.archiveCategory = archiveCategory;
 window.deleteCategory = deleteCategory;
 window.showDayDetails = showDayDetails;
+window.runStatePipeline = runStatePipeline;
 window.addNewExtracurricular = addNewExtracurricular;
 
 // 12. EVENT LISTENERS & SETUP
 function bootApp() {
-  // Load local storage state
+  // Read local state only so loadStateFromFirestore can compare it with the
+  // cloud copy. Migrations and rendering wait for auth (firebase-sync.js).
   loadState();
-  migrateScheduleIfNeeded(); // upgrade older saved schedules (adds Palana onboarding prep)
-  maybeAutoRepairRollover(); // one-time fix for old multi-day rollover damage
-  backfillJuneJulyCompleted(); // one-time: mark all Jun 13–Jul 31 work complete
-  unmarkExamTasksIfBackfilled(); // safety: never leave the AWS/Sec+ exam auto-marked
-  if (typeof extendPlanThroughDec2026 === "function") extendPlanThroughDec2026(); // Sept 3 - Dec 31 plan
-  applyCategoryColors();     // sync edited category colors into CSS variables
-  initUI();
   
   // 1. Overlay click handler
   document.getElementById("overlay-backdrop").addEventListener("click", () => {
@@ -3429,6 +3804,7 @@ function bootApp() {
     if (ahfTarget) ahfTarget.value = appState.settings.ahfWeeklyTarget || 7;
     document.getElementById("settings-aws-passed").checked = appState.settings.awsExamPassed;
     document.getElementById("settings-secplus-passed").checked = appState.settings.securityPlusExamPassed;
+    document.getElementById("settings-awscp-passed").checked = !!appState.settings.awscpExamPassed;
     
     settingsModal.classList.add("open");
     document.getElementById("overlay-backdrop").classList.add("active");
@@ -3457,9 +3833,12 @@ function bootApp() {
     const palSec = document.getElementById("settings-palana-security-toggle");
     if (palSec) appState.settings.palanaSecurityEnabled = palSec.checked;
     const ahfTarget = document.getElementById("settings-ahf-weekly");
+    const prevAhfTarget = appState.settings.ahfWeeklyTarget;
     if (ahfTarget) appState.settings.ahfWeeklyTarget = parseFloat(ahfTarget.value) || 7;
+    if (appState.settings.ahfWeeklyTarget !== prevAhfTarget) resizeFutureAhfTasks();
     appState.settings.awsExamPassed = document.getElementById("settings-aws-passed").checked;
     appState.settings.securityPlusExamPassed = document.getElementById("settings-secplus-passed").checked;
+    appState.settings.awscpExamPassed = document.getElementById("settings-awscp-passed").checked;
     
     closeSettings();
     reflowRemainingCurriculum();
@@ -3519,8 +3898,10 @@ function bootApp() {
 // Run boot immediately if the DOM is already parsed (scripts at end of body
 // can execute after DOMContentLoaded has already fired, in which case a
 // DOMContentLoaded listener would never run — leaving every button dead).
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", bootApp);
-} else {
-  bootApp();
+if (typeof window !== 'undefined' && !window.__NO_BOOT__) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootApp);
+  } else {
+    bootApp();
+  }
 }

@@ -2,8 +2,10 @@
 // CLOUDFLARE WORKER - Mode B proxy for the study-tracker chatbot
 //
 // What this does:
-//   1. Verifies the caller's Google ID token SERVER-SIDE (signature against
-//      Google's published JWKS, issuer, audience, expiry, email_verified).
+//   1. Verifies the caller's Firebase ID token SERVER-SIDE (signature against
+//      the securetoken JWKS, issuer, audience, expiry, auth_time, subject,
+//      email_verified). The app gets this token from the same Google sign-in
+//      the tracker uses (firebase.auth().currentUser.getIdToken()).
 //   2. Checks the email against an allowlist held in a Worker env var.
 //   3. Only then forwards the request body to the Anthropic Messages API,
 //      adding the API key from a Worker secret.
@@ -14,19 +16,27 @@
 //
 // Required environment variables (see README.md):
 //   ANTHROPIC_API_KEY   (secret)   your Anthropic key
-//   GOOGLE_CLIENT_ID    (var)      must match the client ID in auth-config.js
+//   FIREBASE_PROJECT_ID (var)      the Firebase project id (firebase-config.js projectId)
 //   ALLOWED_EMAILS      (var)      comma-separated list of permitted emails
 //   ALLOWED_ORIGINS     (var)      comma-separated list of permitted origins
+//   ALLOWED_MODELS      (var)      comma-separated model ids callers may request
+//                                  (optional; defaults to the models the app offers)
 // ============================================================================
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
-const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
+// Firebase Auth signs ID tokens with the securetoken service account's keys.
+const FIREBASE_JWKS_URL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 
 // Reject oversized bodies outright - this endpoint only ever receives a small
 // JSON payload, and refusing early keeps a hostile caller from burning CPU.
 const MAX_BODY_BYTES = 128 * 1024; // 128 KB
+
+// Upper bound on max_tokens per request, whatever the caller asks for.
+const MAX_TOKENS_LIMIT = 4096;
+
+// Used when ALLOWED_MODELS is not set: exactly the models the app's picker offers.
+const DEFAULT_ALLOWED_MODELS = ["claude-sonnet-5", "claude-haiku-4-5", "claude-opus-5"];
 
 export default {
   async fetch(request, env, ctx) {
@@ -54,23 +64,27 @@ export default {
       return json({ error: "Request body too large" }, 413, cors);
     }
 
-    // --- auth: verify the Google ID token ---
+    // --- auth: verify the Firebase ID token ---
     const authHeader = request.headers.get("Authorization") || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
     if (!token) {
-      return json({ error: "Missing Google ID token" }, 401, cors);
+      return json({ error: "Missing Firebase ID token" }, 401, cors);
     }
 
     let claims;
     try {
-      claims = await verifyGoogleIdToken(token, env.GOOGLE_CLIENT_ID);
+      claims = await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
     } catch (e) {
-      // Never echo the token back, and never log it.
-      return json({ error: `Token rejected: ${e.message}` }, 401, cors);
+      // The reason stays in the Worker log. The caller only learns "invalid",
+      // so crypto/parser errors (which can hint at internals) are never echoed.
+      // Never log or return the token itself.
+      console.log(`[proxy] token rejected: ${e && e.message}`);
+      return json({ error: "Invalid or expired sign-in token" }, 401, cors);
     }
 
+    // 401 = "sign in again"; 403 = "signed in, but not allowed here".
     if (!isEmailAllowed(claims.email, env.ALLOWED_EMAILS)) {
-      return json({ error: "This account is not authorized" }, 401, cors);
+      return json({ error: "This account is not authorized" }, 403, cors);
     }
 
     // --- shape guard on the forwarded body ---
@@ -83,10 +97,16 @@ export default {
     if (!body || typeof body !== "object" || !Array.isArray(body.messages)) {
       return json({ error: "Body must be an Anthropic Messages request" }, 400, cors);
     }
-    // Don't let a caller pick an arbitrarily huge max_tokens on your bill.
-    if (typeof body.max_tokens !== "number" || body.max_tokens > 4096) {
-      body.max_tokens = 2048;
+    // Only allowlisted models: otherwise a caller could pick the priciest one.
+    if (typeof body.model !== "string" || !allowedModels(env).includes(body.model)) {
+      return json({ error: "Model not allowed" }, 400, cors);
     }
+    // Don't let a caller pick an arbitrarily huge max_tokens on your bill:
+    // clamp to the limit (a missing or non-positive value is a bad request).
+    if (typeof body.max_tokens !== "number" || !Number.isFinite(body.max_tokens) || body.max_tokens < 1) {
+      return json({ error: "max_tokens must be a positive number" }, 400, cors);
+    }
+    body.max_tokens = Math.min(Math.floor(body.max_tokens), MAX_TOKENS_LIMIT);
 
     if (!env.ANTHROPIC_API_KEY) {
       return json({ error: "Proxy is missing ANTHROPIC_API_KEY" }, 500, cors);
@@ -149,7 +169,12 @@ function json(obj, status, headers) {
 
 function byteLength(s) { return new TextEncoder().encode(s).length; }
 
-// --- Allowlist --------------------------------------------------------------
+// --- Allowlists --------------------------------------------------------------
+function allowedModels(env) {
+  const list = String(env.ALLOWED_MODELS || "").split(",").map(s => s.trim()).filter(Boolean);
+  return list.length ? list : DEFAULT_ALLOWED_MODELS;
+}
+
 function isEmailAllowed(email, allowedCsv) {
   if (!email) return false;
   const list = String(allowedCsv || "")
@@ -158,19 +183,26 @@ function isEmailAllowed(email, allowedCsv) {
   return list.includes(String(email).trim().toLowerCase());
 }
 
-// --- Google ID token verification -------------------------------------------
-// Full verification: signature (RS256 against Google's JWKS), issuer,
-// audience, expiry, not-before, and email_verified.
+// --- Firebase ID token verification -----------------------------------------
+// Per Firebase's "verify ID tokens using a third-party JWT library" rules:
+// RS256 signature against the securetoken JWKS, iss =
+// https://securetoken.google.com/<projectId>, aud = <projectId>, exp in the
+// future, iat and auth_time in the past, non-empty sub. Plus email_verified.
 let jwksCache = { keys: null, fetchedAt: 0 };
 const JWKS_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-async function getGoogleKeys() {
+// A token signed with a key we haven't cached (Firebase rotates keys) triggers
+// one forced refetch, but not more often than every JWKS_MIN_REFETCH_MS, so
+// junk key ids can't make the Worker hammer Google.
+const JWKS_MIN_REFETCH_MS = 30 * 1000;
+
+async function getFirebaseKeys(force) {
   const now = Date.now();
-  if (jwksCache.keys && now - jwksCache.fetchedAt < JWKS_TTL_MS) {
+  if (jwksCache.keys && (force ? now - jwksCache.fetchedAt < JWKS_MIN_REFETCH_MS : now - jwksCache.fetchedAt < JWKS_TTL_MS)) {
     return jwksCache.keys;
   }
-  const res = await fetch(GOOGLE_JWKS_URL);
-  if (!res.ok) throw new Error("could not fetch Google signing keys");
+  const res = await fetch(FIREBASE_JWKS_URL);
+  if (!res.ok) throw new Error("could not fetch Firebase signing keys");
   const data = await res.json();
   jwksCache = { keys: data.keys || [], fetchedAt: now };
   return jwksCache.keys;
@@ -189,7 +221,8 @@ function b64urlToJson(s) {
   return JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
 }
 
-export async function verifyGoogleIdToken(token, expectedAud) {
+export async function verifyFirebaseIdToken(token, projectId) {
+  if (!projectId) throw new Error("proxy is missing FIREBASE_PROJECT_ID");
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("malformed token");
 
@@ -206,8 +239,8 @@ export async function verifyGoogleIdToken(token, expectedAud) {
   if (header.alg !== "RS256") throw new Error("unexpected signing algorithm");
 
   // --- signature ---
-  const keys = await getGoogleKeys();
-  const jwk = keys.find(k => k.kid === header.kid);
+  let jwk = (await getFirebaseKeys()).find(k => k.kid === header.kid);
+  if (!jwk) jwk = (await getFirebaseKeys(true)).find(k => k.kid === header.kid);
   if (!jwk) throw new Error("unknown signing key");
 
   const key = await crypto.subtle.importKey(
@@ -227,10 +260,9 @@ export async function verifyGoogleIdToken(token, expectedAud) {
   if (!valid) throw new Error("signature verification failed");
 
   // --- claims ---
-  if (!GOOGLE_ISSUERS.includes(claims.iss)) throw new Error("unexpected issuer");
-
-  if (!expectedAud) throw new Error("proxy is missing GOOGLE_CLIENT_ID");
-  if (claims.aud !== expectedAud) throw new Error("audience mismatch");
+  if (claims.iss !== `https://securetoken.google.com/${projectId}`) throw new Error("unexpected issuer");
+  if (claims.aud !== projectId) throw new Error("audience mismatch");
+  if (typeof claims.sub !== "string" || !claims.sub || claims.sub.length > 128) throw new Error("invalid subject");
 
   const now = Math.floor(Date.now() / 1000);
   const SKEW = 60; // seconds of clock tolerance
@@ -240,14 +272,17 @@ export async function verifyGoogleIdToken(token, expectedAud) {
   if (typeof claims.nbf === "number" && now < claims.nbf - SKEW) {
     throw new Error("token not yet valid");
   }
-  if (typeof claims.iat === "number" && now < claims.iat - SKEW) {
+  if (typeof claims.iat !== "number" || now < claims.iat - SKEW) {
     throw new Error("token issued in the future");
   }
-  if (claims.email_verified === false) throw new Error("email not verified");
+  if (typeof claims.auth_time !== "number" || now < claims.auth_time - SKEW) {
+    throw new Error("invalid auth_time");
+  }
+  if (claims.email_verified !== true) throw new Error("email not verified");
   if (!claims.email) throw new Error("token has no email claim");
 
   return claims;
 }
 
 // Exported for tests.
-export const __internals = { isEmailAllowed, isOriginAllowed, MAX_BODY_BYTES };
+export const __internals = { isEmailAllowed, isOriginAllowed, allowedModels, MAX_BODY_BYTES, MAX_TOKENS_LIMIT };

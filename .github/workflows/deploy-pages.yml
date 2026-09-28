@@ -23,8 +23,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+
+      # Publish only what the browser needs. proxy/ (the Worker and its README),
+      # the tests, package.json, firestore.rules, README.md and .github/ stay out
+      # of the site.
+      - name: Stage site files into _site
+        run: |
+          mkdir _site
+          cp index.html _site/
+          cp *.css _site/                      # style.css (linked from index.html)
+          for f in *.js; do                    # app, plan, export, sync, config...
+            case "$f" in
+              test-*.js) ;;                    # test-scheduler.js, test-sync.js
+              *) cp "$f" _site/ ;;
+            esac
+          done
+          cp -R css js _site/
+          find _site -type f | sort
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

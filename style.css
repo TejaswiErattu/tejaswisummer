@@ -20,6 +20,7 @@
   
   --text-primary: #fff0f6;   /* Rose White */
   --text-muted: #bda8d4;     /* Muted Lavender Grey */
+  --text-secondary: #b9b9c9; /* Softer body text (subtask labels, hints) */
   --text-dark: #120721;
   
   /* Category Colors - Beautiful Pastel Palette */
@@ -36,6 +37,15 @@
   --cat-jobapps: #ffc48c;      /* Warm apricot */
   --cat-interviews: #b9f6a5;   /* Fresh green */
   --cat-hackathons: #ff9ff3;   /* Neon pink */
+  /* Defaults below match BUILT_IN_CATEGORIES in app.js; applyCategoryColors()
+     overrides every --cat-<id> at runtime. */
+  --cat-winfo: #90EE90;
+  --cat-mentor: #FFD700;
+  --cat-travel: #87CEEB;
+  --cat-catchup: #DDA0DD;
+  --cat-personal: #F0E68C;
+  --cat-palana_security: #FF6B6B;
+  --cat-custom: #ffffff;
 
   --font-mono: 'Share Tech Mono', monospace;
   --font-sans: 'Outfit', 'Inter', sans-serif;
@@ -362,7 +372,7 @@ input:checked + .slider:before {
 
 .metric-card.glow-green::before { background: var(--neon-green); }
 .metric-card.glow-cyan::before { background: var(--neon-cyan); }
-.metric-card.glow-yellow::before { background: var(--neon-pink); }
+.metric-card.glow-yellow::before { background: var(--neon-yellow); }
 .metric-card.glow-purple::before { background: var(--neon-purple); }
 .metric-card.glow-orange::before { background: var(--neon-coral); }
 
@@ -374,7 +384,7 @@ input:checked + .slider:before {
 
 .metric-card.glow-green:hover { box-shadow: 0 4px 20px rgba(80, 250, 123, 0.05), var(--shadow-box); }
 .metric-card.glow-cyan:hover { box-shadow: 0 4px 20px rgba(139, 233, 253, 0.05), var(--shadow-box); }
-.metric-card.glow-yellow:hover { box-shadow: 0 4px 20px rgba(255, 121, 198, 0.05), var(--shadow-box); }
+.metric-card.glow-yellow:hover { box-shadow: 0 4px 20px rgba(241, 250, 140, 0.05), var(--shadow-box); }
 .metric-card.glow-purple:hover { box-shadow: 0 4px 20px rgba(189, 147, 249, 0.05), var(--shadow-box); }
 .metric-card.glow-orange:hover { box-shadow: 0 4px 20px rgba(255, 184, 108, 0.05), var(--shadow-box); }
 
@@ -424,7 +434,7 @@ input:checked + .slider:before {
 
 .glow-green .progress-bar-fill { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
 .glow-cyan .progress-bar-fill { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan); }
-.glow-yellow .progress-bar-fill { background: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink); }
+.glow-yellow .progress-bar-fill { background: var(--neon-yellow); box-shadow: 0 0 8px var(--neon-yellow); }
 .glow-purple .progress-bar-fill { background: var(--neon-purple); box-shadow: 0 0 8px var(--neon-purple); }
 
 /* Cert Status Items */
@@ -499,6 +509,7 @@ input:checked + .slider:before {
 
 .checkbox-container {
   display: flex;
+  align-items: center;
   position: relative;
   padding-left: 28px;
   cursor: pointer;
@@ -628,6 +639,13 @@ input:checked + .slider:before {
 .dot-jobapps { background: var(--cat-jobapps); box-shadow: 0 0 6px var(--cat-jobapps); }
 .dot-interviews { background: var(--cat-interviews); box-shadow: 0 0 6px var(--cat-interviews); }
 .dot-hackathons { background: var(--cat-hackathons); box-shadow: 0 0 6px var(--cat-hackathons); }
+.dot-winfo { background: var(--cat-winfo); box-shadow: 0 0 6px var(--cat-winfo); }
+.dot-mentor { background: var(--cat-mentor); box-shadow: 0 0 6px var(--cat-mentor); }
+.dot-travel { background: var(--cat-travel); box-shadow: 0 0 6px var(--cat-travel); }
+.dot-catchup { background: var(--cat-catchup); box-shadow: 0 0 6px var(--cat-catchup); }
+.dot-personal { background: var(--cat-personal); box-shadow: 0 0 6px var(--cat-personal); }
+.dot-palana_security { background: var(--cat-palana_security); box-shadow: 0 0 6px var(--cat-palana_security); }
+.dot-custom { background: var(--cat-custom); box-shadow: 0 0 6px var(--cat-custom); }
 
 /* Main Central Panel Styles */
 .workspace-main {
@@ -764,11 +782,6 @@ input:checked + .slider:before {
   border-bottom: 1px solid rgba(255, 121, 198, 0.04);
 }
 
-.calendar-days-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-}
-
 .calendar-days-container {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -886,7 +899,12 @@ input:checked + .slider:before {
 .day-task-block {
   font-family: var(--font-sans);
   font-size: 0.55rem;
-  padding: 1px 4px;
+  /* 1px border + 3px side padding = the same box as the old 4px padding. */
+  padding: 0 3px;
+  /* Default look for any category without its own rule (see the known-category
+     list below, which switches the border off): visible background + border. */
+  background: #b8a9cc;
+  border: 1px solid #e6dcf5;
   border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
@@ -903,19 +921,48 @@ input:checked + .slider:before {
   background: #26163a !important;
 }
 
+/* Known categories: recolourable via --cat-<id>, no border. Text is dark
+   (var(--text-dark)) on the light pastel defaults, incl. ahf/palana. */
+.day-task-block.cat-portswigger,
+.day-task-block.cat-secplus,
+.day-task-block.cat-aws,
+.day-task-block.cat-leetcode,
+.day-task-block.cat-ahf,
+.day-task-block.cat-info310,
+.day-task-block.cat-palana,
+.day-task-block.cat-github,
+.day-task-block.cat-projects,
+.day-task-block.cat-awscp,
+.day-task-block.cat-jobapps,
+.day-task-block.cat-interviews,
+.day-task-block.cat-hackathons,
+.day-task-block.cat-winfo,
+.day-task-block.cat-mentor,
+.day-task-block.cat-palana_security,
+.day-task-block.cat-travel,
+.day-task-block.cat-catchup,
+.day-task-block.cat-personal,
+.day-task-block.cat-custom { border-color: transparent; }
 .day-task-block.cat-portswigger { background: var(--cat-portswigger); }
 .day-task-block.cat-secplus { background: var(--cat-secplus); }
 .day-task-block.cat-aws { background: var(--cat-aws); }
 .day-task-block.cat-leetcode { background: var(--cat-leetcode); }
-.day-task-block.cat-ahf { background: var(--cat-ahf); color: #fff; }
+.day-task-block.cat-ahf { background: var(--cat-ahf); }
 .day-task-block.cat-info310 { background: var(--cat-info310); }
-.day-task-block.cat-palana { background: var(--cat-palana); color: #fff; }
+.day-task-block.cat-palana { background: var(--cat-palana); }
 .day-task-block.cat-github { background: var(--cat-github); }
 .day-task-block.cat-projects { background: var(--cat-projects); }
 .day-task-block.cat-awscp { background: var(--cat-awscp); }
 .day-task-block.cat-jobapps { background: var(--cat-jobapps); }
 .day-task-block.cat-interviews { background: var(--cat-interviews); }
-.day-task-block.cat-hackathons { background: var(--cat-hackathons); color: #fff; }
+.day-task-block.cat-hackathons { background: var(--cat-hackathons); }
+.day-task-block.cat-winfo { background: var(--cat-winfo); }
+.day-task-block.cat-mentor { background: var(--cat-mentor); }
+.day-task-block.cat-palana_security { background: var(--cat-palana_security); }
+.day-task-block.cat-travel { background: var(--cat-travel); }
+.day-task-block.cat-catchup { background: var(--cat-catchup); }
+.day-task-block.cat-personal { background: var(--cat-personal); }
+.day-task-block.cat-custom { background: var(--cat-custom); }
 
 /* Warning icon inside cell if overflow */
 .cell-warning-icon {
@@ -991,7 +1038,6 @@ input:checked + .slider:before {
 .track-item-row.comp-aws { border-left-color: var(--cat-aws); }
 .track-item-row.comp-secplus { border-left-color: var(--cat-secplus); }
 .track-item-row.comp-projects { border-left-color: var(--cat-projects); }
-.track-item-row.comp-awscp { border-left-color: var(--cat-awscp); }
 
 .track-item-row.task-checked {
   opacity: 0.5;
@@ -1193,6 +1239,11 @@ input:checked + .slider:before {
   font-family: var(--font-mono);
   font-size: 0.55rem;
   padding: 0.05rem 0.3rem;
+  /* Default for categories without a .badge-<id> rule; those rules come later
+     and override all three of these. */
+  background: rgba(189, 168, 212, 0.12);
+  color: var(--text-muted);
+  border: 1px solid rgba(189, 168, 212, 0.55);
   border-radius: 3px;
   text-transform: uppercase;
   font-weight: 600;
@@ -1208,6 +1259,24 @@ input:checked + .slider:before {
 .badge-palana { background: rgba(255, 133, 162, 0.15); color: #ff85a2; border: 1px solid #ff85a2; }
 .badge-github { background: rgba(255, 234, 121, 0.1); color: #ffea79; border: 1px solid #ffea79; }
 .badge-projects { background: rgba(226, 187, 253, 0.1); color: #e2bbfd; border: 1px solid #e2bbfd; }
+/* Badges below take their colour from --cat-<id>, so applyCategoryColors() recolours them. */
+.badge-awscp, .badge-jobapps, .badge-interviews, .badge-hackathons, .badge-winfo, .badge-mentor,
+.badge-travel, .badge-catchup, .badge-personal, .badge-palana_security, .badge-custom {
+  background: color-mix(in srgb, var(--badge-c) 12%, transparent);
+  color: var(--badge-c);
+  border: 1px solid var(--badge-c);
+}
+.badge-awscp { --badge-c: var(--cat-awscp); }
+.badge-jobapps { --badge-c: var(--cat-jobapps); }
+.badge-interviews { --badge-c: var(--cat-interviews); }
+.badge-hackathons { --badge-c: var(--cat-hackathons); }
+.badge-winfo { --badge-c: var(--cat-winfo); }
+.badge-mentor { --badge-c: var(--cat-mentor); }
+.badge-travel { --badge-c: var(--cat-travel); }
+.badge-catchup { --badge-c: var(--cat-catchup); }
+.badge-personal { --badge-c: var(--cat-personal); }
+.badge-palana_security { --badge-c: var(--cat-palana_security); }
+.badge-custom { --badge-c: var(--cat-custom); }
 
 .task-link-arrow {
   color: var(--neon-pink);
@@ -1327,16 +1396,24 @@ input:checked + .slider:before {
   border-radius: 12px;
   box-shadow: 0 15px 50px rgba(0,0,0,0.8);
   z-index: 1020;
-  display: none;
+  display: flex;
   flex-direction: column;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Hidden via visibility/opacity (not display) so the open/close transition
+     can run; visibility flips after the fade on close and at once on open. */
+  visibility: hidden;
   opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0s linear 0.3s;
 }
 
 .modal.open {
-  display: flex;
+  visibility: visible;
+  pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
   opacity: 1;
+  transition-delay: 0s;
 }
 
 .modal-header {
@@ -1367,7 +1444,9 @@ input:checked + .slider:before {
 }
 
 .form-group label {
-  font-size: 0.8rem;
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
   color: var(--text-primary);
   font-weight: 500;
 }
@@ -1423,12 +1502,6 @@ input:checked + .slider:before {
 
 .checkbox-row {
   margin-top: 0.5rem;
-}
-
-/* Custom Checkbox in Settings */
-.checkbox-container {
-  display: flex;
-  align-items: center;
 }
 
 /* Danger Section inside modal */
@@ -1712,6 +1785,22 @@ input:checked + .slider:before {
   background: rgba(255, 100, 100, 0.1);
 }
 
+/* ── SYNC STATUS INDICATOR ───────────────────────────────── */
+.sync-indicator {
+  margin-left: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.sync-indicator.hidden { display: none; }
+.sync-indicator[data-state="synced"]  { color: var(--neon-green); }
+.sync-indicator[data-state="saving"]  { color: var(--neon-cyan); }
+.sync-indicator[data-state="offline"] { color: var(--neon-yellow, #ffea79); }
+.sync-indicator[data-state="error"]   { color: #ff6060; }
+
 /* ── AUTH TOAST NOTIFICATION ───────────────────────────────── */
 .auth-toast {
   position: fixed;
@@ -1856,13 +1945,6 @@ input:checked + .slider:before {
 .task-delete-btn:hover {
   color: #ff5555;
   background: rgba(255, 80, 80, 0.1);
-}
-
-/* Custom category badge */
-.badge-custom {
-  background: rgba(200, 100, 255, 0.15);
-  color: #d088ff;
-  border: 1px solid rgba(200, 100, 255, 0.3);
 }
 
 /* ==========================================================================
@@ -2071,8 +2153,8 @@ input:checked + .slider:before {
   gap: 0.5rem 0.75rem;
 }
 
-.export-check {
-  font-size: 0.78rem !important;
+.checkbox-container.export-check {
+  font-size: 0.78rem;
   color: var(--text-primary);
   gap: 0.5rem;
 }
@@ -2165,15 +2247,6 @@ input:checked + .slider:before {
 }
 
 /* ⭐ NEW: Extracurricular Summary Styles */
-.extracurricular-section {
-  margin-top: 3rem;
-  padding: 2rem;
-  background: var(--bg-card);
-  border: 1px solid var(--border-neon-purple);
-  border-radius: 12px;
-  box-shadow: var(--shadow-box);
-}
-
 .extracurricular-header-row {
   display: flex;
   justify-content: space-between;
@@ -2348,19 +2421,7 @@ input:checked + .slider:before {
   text-align: center;
 }
 
-/* Form Styles for Extracurricular Modal */
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
+/* Form Styles for Extracurricular Modal (.form-group is defined once, above) */
 .form-input {
   width: 100%;
   padding: 0.75rem;
@@ -2379,7 +2440,7 @@ input:checked + .slider:before {
   box-shadow: var(--glow-purple);
 }
 
-.form-input textarea {
+textarea.form-input {
   resize: vertical;
   min-height: 80px;
   font-family: var(--font-mono);
@@ -2469,7 +2530,6 @@ input:checked + .slider:before {
 .today-all-done { color: var(--neon-green); font-size: 0.85rem; }
 .notes-dot, .fixed-badge { font-size: 0.65rem; }
 
-.day-cell.today-cell { outline: 2px solid var(--neon-cyan); box-shadow: 0 0 12px rgba(0, 255, 255, 0.35); }
 .today-badge { display: inline-block; margin-left: 4px; font-size: 0.55rem; background: var(--neon-cyan); color: #000; padding: 1px 4px; border-radius: 3px; font-weight: 700; vertical-align: middle; }
 .day-cell.past-day { opacity: 0.85; }
 .day-cell.past-day .day-number { color: var(--text-muted); }
@@ -2582,18 +2642,11 @@ input:checked + .slider:before {
 .status-blocked { background: rgba(255,0,0,0.15); color: #ff6b6b; }
 .owner-badge { font-size: 0.55rem; padding: 0.1rem 0.3rem; border-radius: 3px; margin-left: 0.25rem; background: rgba(255,234,121,0.15); color: #ffea79; }
 
-.day-task-block.cat-winfo { background: #90EE90; color: #1a3d1a; }
-.day-task-block.cat-mentor { background: #FFD700; color: #3d3d00; }
-.day-task-block.cat-palana_security { background: #FF6B6B; color: #fff; }
-.day-task-block.cat-travel { background: #87CEEB; }
 .badge-winfo, .badge-mentor, .badge-palana_security, .badge-travel { font-size: 0.6rem; }
 
 .notes-field { margin-bottom: 0.75rem; }
 .notes-field label { display: block; font-size: 0.7rem; color: var(--neon-purple); margin-bottom: 0.25rem; }
 .notes-sm { min-height: 48px; }
-
-.dot-winfo { background: #90EE90; }
-.dot-mentor { background: #FFD700; }
 
 @media (max-width: 768px) {
   .today-section-header { flex-direction: column; }
@@ -2623,6 +2676,18 @@ input:checked + .slider:before {
   font-size: 0.55rem;
   letter-spacing: 0.06em;
   color: var(--neon-yellow, #ffea79);
+  vertical-align: middle;
+}
+.task-rolled-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--neon-cyan, #00d4ff);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan, #00d4ff);
   vertical-align: middle;
 }
 .day-task-block.block-milestone {

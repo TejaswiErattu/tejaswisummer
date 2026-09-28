@@ -10,6 +10,12 @@
 export const MAX_INSTANCES_PER_BATCH = 200;
 export const MAX_QUESTIONS = 4;
 
+// Field length limits (characters).
+export const MAX_TITLE_LEN = 200;
+export const MAX_NOTES_LEN = 2000;
+export const MAX_NAME_LEN = 80;
+export const MAX_SUBTASK_LEN = 200;
+
 export const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 // --- Field contracts --------------------------------------------------------
@@ -17,12 +23,12 @@ export const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const OPERATION_SCHEMA = {
   add_task: {
     required: ["title", "category", "date"],
-    optional: ["estimatedMinutes", "notes", "track"],
+    optional: ["estimatedMinutes", "notes"],
     label: "Add task"
   },
   add_recurring_task: {
     required: ["title", "category", "startDate", "endDate", "recurrence"],
-    optional: ["estimatedMinutes", "notes", "track"],
+    optional: ["estimatedMinutes", "notes"],
     label: "Add recurring task"
   },
   add_milestone: {
@@ -64,13 +70,30 @@ export const OPERATION_SCHEMA = {
     required: ["name", "targetDate"],
     optional: ["subtasks"],
     label: "Add project"
-  },
-  add_subsection: {
-    required: ["key", "title"],
-    optional: ["dateRangeLabel"],
-    label: "Add subsection"
   }
 };
+
+export const MAX_PROJECT_SUBTASKS = 30;
+
+// Project ids are derived from the name, so the validator and the adapter agree.
+export function projectIdFor(name) {
+  return `bot_${String(name).toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 28)}`;
+}
+
+// n dates spread evenly from startDate to endDate inclusive (first on the
+// start, last on the end). Several may share a date if the range is short.
+export function spreadDates(startDate, endDate, n) {
+  if (n <= 0) return [];
+  if (n === 1 || startDate >= endDate) return Array(n).fill(endDate);
+  const span = Math.round((parseDateStr(endDate) - parseDateStr(startDate)) / 86400000);
+  return Array.from({ length: n }, (_, i) => addDays(startDate, Math.round((i * span) / (n - 1))));
+}
+
+// Task instances an add_project creates: one per subtask, or one for the
+// project itself when no subtasks are given.
+export function projectTaskCount(op) {
+  return Array.isArray(op.subtasks) && op.subtasks.length ? op.subtasks.length : 1;
+}
 
 export const OPERATION_NAMES = Object.keys(OPERATION_SCHEMA);
 
@@ -173,6 +196,24 @@ function err(index, op, message) {
   return { index, op: op && op.op, message };
 }
 
+// estimatedMinutes: a real number, an integer, 1..1440. Used by add_task,
+// add_milestone, add_recurring_task and update_task alike.
+function checkMinutes(v, push, label) {
+  if (typeof v !== "number" || !Number.isFinite(v) || !Number.isInteger(v) || v < 1 || v > 24 * 60) {
+    push(`${label} must be a whole number of minutes between 1 and 1440 (got ${JSON.stringify(v)})`);
+  }
+}
+
+// A string field: must be a string, non-empty when `required`, within maxLen.
+function checkString(v, label, maxLen, push, required) {
+  if (typeof v !== "string") { push(`"${label}" must be a string`); return; }
+  if (required && !v.trim()) { push(`"${label}" must not be empty`); return; }
+  if (v.length > maxLen) push(`"${label}" is too long (${v.length} characters, max ${maxLen})`);
+}
+
+// Which of an operation's string fields are limited, and how.
+const STRING_LIMITS = { title: MAX_TITLE_LEN, name: MAX_NAME_LEN, displayName: MAX_NAME_LEN, notes: MAX_NOTES_LEN };
+
 export function validateOperation(op, ctx, index = 0) {
   const errors = [];
   const push = (m) => errors.push(err(index, op, m));
@@ -214,6 +255,32 @@ export function validateOperation(op, ctx, index = 0) {
     }
   }
 
+  // Plan window: dates outside START_DATE_STR..END_DATE_STR (supplied by the
+  // adapter from the host) are rejected.
+  const inWindow = (label, v) => {
+    if (typeof v !== "string" || !isValidDateStr(v) || !ctx.planStart || !ctx.planEnd) return;
+    if (v < ctx.planStart || v > ctx.planEnd) {
+      push(`"${label}" ${v} is outside the plan (${ctx.planStart} to ${ctx.planEnd})`);
+    }
+  };
+  for (const f of DATE_FIELDS) if (op[f] !== undefined && op[f] !== null) inWindow(f, op[f]);
+  if (op.changes && typeof op.changes === "object" && op.changes.date !== undefined) inWindow("changes.date", op.changes.date);
+
+  // Required string fields are non-empty strings; optional ones (notes) are
+  // strings when present. Everything is length-limited.
+  for (const f of Object.keys(STRING_LIMITS)) {
+    if (op[f] === undefined) continue;
+    checkString(op[f], f, STRING_LIMITS[f], push, schema.required.includes(f));
+  }
+  for (const f of ["key", "category", "taskId", "seriesId"]) {
+    if (op[f] !== undefined && typeof op[f] !== "string") push(`"${f}" must be a string`);
+  }
+  if (op.changes && typeof op.changes === "object" && !Array.isArray(op.changes)) {
+    if (op.changes.title !== undefined) checkString(op.changes.title, "changes.title", MAX_TITLE_LEN, push, true);
+    if (op.changes.notes !== undefined) checkString(op.changes.notes, "changes.notes", MAX_NOTES_LEN, push, false);
+    if (op.changes.category !== undefined && typeof op.changes.category !== "string") push('"changes.category" must be a string');
+  }
+
   const categoryExists = (key) =>
     ctx.categoryKeys.has(key) || ctx.pendingCategoryKeys.has(key);
 
@@ -224,24 +291,14 @@ export function validateOperation(op, ctx, index = 0) {
       if (op.category && !categoryExists(op.category)) {
         push(`category "${op.category}" does not exist and is not created in this batch`);
       }
-      if (op.estimatedMinutes !== undefined) {
-        const m = Number(op.estimatedMinutes);
-        if (!Number.isFinite(m) || m <= 0 || m > 24 * 60) {
-          push(`estimatedMinutes must be between 1 and 1440 (got ${op.estimatedMinutes})`);
-        }
-      }
+      if (op.estimatedMinutes !== undefined) checkMinutes(op.estimatedMinutes, push, "estimatedMinutes");
       break;
 
     case "add_recurring_task": {
       if (op.category && !categoryExists(op.category)) {
         push(`category "${op.category}" does not exist and is not created in this batch`);
       }
-      if (op.estimatedMinutes !== undefined) {
-        const m = Number(op.estimatedMinutes);
-        if (!Number.isFinite(m) || m <= 0 || m > 24 * 60) {
-          push(`estimatedMinutes must be between 1 and 1440 (got ${op.estimatedMinutes})`);
-        }
-      }
+      if (op.estimatedMinutes !== undefined) checkMinutes(op.estimatedMinutes, push, "estimatedMinutes");
       const { dates, error } = expandRecurrence(op);
       if (error) push(error);
       else if (dates.length === 0) push("this recurrence produces no dates in the given range");
@@ -253,12 +310,13 @@ export function validateOperation(op, ctx, index = 0) {
         push(`taskId "${op.taskId}" does not exist`);
       }
       if (op.changes && typeof op.changes === "object" && !Array.isArray(op.changes)) {
-        const allowedChanges = ["title", "category", "date", "estimatedMinutes", "notes", "track"];
+        const allowedChanges = ["title", "category", "date", "estimatedMinutes", "notes"];
         const keys = Object.keys(op.changes);
         if (keys.length === 0) push("changes is empty - nothing to update");
         for (const k of keys) {
           if (!allowedChanges.includes(k)) push(`changes."${k}" is not an updatable field`);
         }
+        if (op.changes.estimatedMinutes !== undefined) checkMinutes(op.changes.estimatedMinutes, push, "changes.estimatedMinutes");
         if (op.changes.category && !categoryExists(op.changes.category)) {
           push(`changes.category "${op.changes.category}" does not exist`);
         }
@@ -314,13 +372,17 @@ export function validateOperation(op, ctx, index = 0) {
       if (op.subtasks !== undefined) {
         if (!Array.isArray(op.subtasks) || op.subtasks.some(s => typeof s !== "string" || !s.trim())) {
           push("subtasks must be an array of non-empty strings");
+        } else if (op.subtasks.length > MAX_PROJECT_SUBTASKS) {
+          push(`at most ${MAX_PROJECT_SUBTASKS} subtasks per project`);
+        } else if (op.subtasks.some(s => s.length > MAX_SUBTASK_LEN)) {
+          push(`each subtask must be at most ${MAX_SUBTASK_LEN} characters`);
         }
       }
-      break;
-
-    case "add_subsection":
-      if (typeof op.key !== "string" || !/^[a-z][a-z0-9_]{1,30}$/.test(op.key || "")) {
-        push('key must be lowercase letters/digits/underscores, 2-31 chars');
+      if (op.targetDate && ctx.today && op.targetDate < ctx.today) {
+        push(`targetDate ${op.targetDate} is in the past`);
+      }
+      if (op.name && ctx.projectIds && ctx.projectIds.has(projectIdFor(op.name))) {
+        push(`a project named "${op.name}" already exists`);
       }
       break;
   }
@@ -351,10 +413,18 @@ export function validateBatch(operations, baseCtx) {
 
   let instanceCount = 0;
   let truncated = false;
+  const seenCategoryKeys = new Set();
   operations.forEach((op, i) => {
     errors.push(...validateOperation(op, ctx, i));
     if (!op) return;
+    if (op.op === "add_category" && typeof op.key === "string") {
+      if (seenCategoryKeys.has(op.key)) {
+        errors.push(err(i, op, `category "${op.key}" is added more than once in this batch`));
+      }
+      seenCategoryKeys.add(op.key);
+    }
     if (op.op === "add_task" || op.op === "add_milestone") instanceCount += 1;
+    if (op.op === "add_project") instanceCount += projectTaskCount(op);
     if (op.op === "add_recurring_task") {
       const r = expandRecurrence(op);
       instanceCount += r.dates.length;
@@ -382,11 +452,22 @@ export function validateBatch(operations, baseCtx) {
 export function findRiskyOperations(operations, ctx) {
   const risky = [];
   const isMutating = (o) =>
-    ["update_task", "move_task", "delete_task", "set_completion"].includes(o.op);
+    ["update_task", "move_task", "delete_task", "set_completion", "delete_recurring_series"].includes(o.op);
 
   operations.forEach((op, index) => {
     if (!op || !isMutating(op)) return;
     const reasons = [];
+
+    // A series delete removes many tasks at once, some possibly past or done.
+    if (op.op === "delete_recurring_series") {
+      reasons.push(op.scope === "all"
+        ? "it deletes every task in the series, including past ones"
+        : "it deletes every remaining task in the series");
+      if (op.fromDate && op.fromDate < ctx.today) reasons.push(`it starts deleting in the past (${op.fromDate})`);
+    }
+    if (op.op === "update_task" && op.changes && typeof op.changes.date === "string" && op.changes.date < ctx.today) {
+      reasons.push(`it would be moved into the past (${op.changes.date})`);
+    }
 
     if (op.taskId && ctx.completedTaskIds.has(op.taskId)) {
       reasons.push("this task is already marked complete");

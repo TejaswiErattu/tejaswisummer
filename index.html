@@ -8,9 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260616">
-  <link rel="stylesheet" href="css/chatbot.css?v=20260916a">
-  <link rel="stylesheet" href="css/auth-gate.css?v=20260916a">
+  <link rel="stylesheet" href="style.css?v=20260927b">
+  <link rel="stylesheet" href="css/chatbot.css?v=20260927c">
+  <link rel="stylesheet" href="css/auth-gate.css?v=20260927b">
 </head>
 <body class="hacker-theme app-locked">
   <!-- Sign-in gate. Ships visible; js/auth-gate.js is the only thing that lifts it. -->
@@ -56,6 +56,7 @@
     <div class="auth-bar-left">
       <img id="auth-avatar" class="auth-avatar hidden" src="" alt="avatar">
       <span id="auth-user-info" class="auth-user-info hidden"></span>
+      <span id="sync-indicator" class="sync-indicator hidden" data-state="synced" role="status" aria-live="polite">Synced</span>
     </div>
     <div class="auth-bar-right">
       <button id="auth-signin-btn" class="auth-signin-btn">
@@ -114,7 +115,7 @@
         <line x1="12" y1="9" x2="12" y2="13"></line>
         <line x1="12" y1="17" x2="12.01" y2="17"></line>
       </svg>
-      <span>CRITICAL ALERT: Plan at risk of completion overflow. Current rollover tasks exceed target date (September 1, 2026). Please increase daily hours or adjust projects!</span>
+      <span>CRITICAL ALERT: Plan at risk of completion overflow. Current rollover tasks run past the plan's end date (December 31, 2026). Please increase daily hours or adjust projects!</span>
     </div>
   </div>
 
@@ -166,7 +167,7 @@
         <div class="progress-bar-container">
           <div class="progress-bar-fill" id="metric-leetcode-fill" style="width: 0%"></div>
         </div>
-        <div class="metric-footer">1 problem per day standard</div>
+        <div class="metric-footer">Daily practice, paced by the plan</div>
       </div>
 
       <!-- Card: Certifications State -->
@@ -293,6 +294,11 @@
             <div class="legend-item"><span class="legend-dot dot-jobapps"></span> Job Applications</div>
             <div class="legend-item"><span class="legend-dot dot-interviews"></span> Interviews</div>
             <div class="legend-item"><span class="legend-dot dot-hackathons"></span> Hackathons</div>
+            <div class="legend-item"><span class="legend-dot dot-palana_security"></span> Palana Security</div>
+            <div class="legend-item"><span class="legend-dot dot-travel"></span> Travel</div>
+            <div class="legend-item"><span class="legend-dot dot-personal"></span> Personal</div>
+            <div class="legend-item"><span class="legend-dot dot-catchup"></span> Catch-Up</div>
+            <div class="legend-item"><span class="legend-dot dot-custom"></span> Custom</div>
           </div>
           <button id="open-category-manager-btn" class="category-manager-btn" onclick="openCategoryManager()">+ Manage Categories</button>
         </div>
@@ -438,21 +444,8 @@
           >
           <div class="add-task-row">
             <select id="new-task-category" class="add-task-select">
+              <!-- Rebuilt from the live category list by populateCategorySelects() -->
               <option value="custom">custom</option>
-              <option value="portswigger">portswigger</option>
-              <option value="aws">aws</option>
-              <option value="secplus">secplus</option>
-              <option value="projects">projects</option>
-              <option value="leetcode">leetcode</option>
-              <option value="ahf">ahf</option>
-              <option value="palana">palana</option>
-              <option value="github">github</option>
-              <option value="winfo">winfo</option>
-              <option value="mentor">mentor</option>
-              <option value="awscp">awscp</option>
-              <option value="jobapps">jobapps</option>
-              <option value="interviews">interviews</option>
-              <option value="hackathons">hackathons</option>
             </select>
             <input
               type="number"
@@ -558,9 +551,13 @@
             <option value="active">Active</option>
             <option value="paused">Paused</option>
             <option value="archived">Archived</option>
-            <option value="active-until-june-27">Active Until June 27</option>
-            <option value="active-through-aug-21">Active Through Aug 21</option>
+            <option value="active-until-date">Active Until a Set Date</option>
             <option value="active-until-passed">Active Until Passed</option>
+            <option value="completed">Completed</option>
+            <!-- Legacy values saved by earlier versions: hidden from the list but still selectable/displayed. -->
+            <option value="active-until-june-27" hidden>Active Until a Set Date (June 27)</option>
+            <option value="active-through-june-27" hidden>Active Until a Set Date (June 27)</option>
+            <option value="active-through-aug-21" hidden>Active Until a Set Date (Aug 21)</option>
           </select>
         </div>
         <div class="form-group">
@@ -647,6 +644,13 @@
               <input type="checkbox" id="settings-secplus-passed">
               <span class="custom-checkbox"></span>
               Mark CompTIA Security+ Exam as Passed ✅
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <label class="checkbox-container">
+              <input type="checkbox" id="settings-awscp-passed">
+              <span class="custom-checkbox"></span>
+              Mark AWS Cloud Practitioner as Passed ✅
             </label>
           </div>
         </div>
@@ -739,8 +743,6 @@
     </div>
   </div>
 
-  </div>
-
   <!-- Category Manager Modal -->
   <div id="category-modal" class="modal modal-wide">
     <div class="modal-header">
@@ -768,15 +770,16 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <!-- Script references -->
-  <script src="blind75.js?v=20260616"></script>
-  <script src="git-roadmap.js?v=20260616"></script>
-  <script src="firebase-config.js?v=20260616"></script>
-  <script src="app.js?v=20260616"></script>
-  <script src="plan-extension-2026.js?v=20260915"></script>
-  <script src="export.js?v=20260616"></script>
-  <script src="firebase-sync.js?v=20260616"></script>
-  <script src="js/auth-gate.js?v=20260916a"></script>
+  <script src="blind75.js?v=20260927b"></script>
+  <script src="git-roadmap.js?v=20260927b"></script>
+  <script src="firebase-config.js?v=20260927b"></script>
+  <script src="js/sync-core.js?v=20260927b"></script>
+  <script src="app.js?v=20260927c"></script>
+  <script src="plan-extension-2026.js?v=20260927c"></script>
+  <script src="export.js?v=20260927b"></script>
+  <script src="firebase-sync.js?v=20260927b"></script>
+  <script src="js/auth-gate.js?v=20260927b"></script>
   <!-- Assistant panel. Self-contained ES module; talks to the app only via js/chatbot/adapter.js -->
-  <script type="module" src="js/chatbot/index.js?v=20260916a"></script>
+  <script type="module" src="js/chatbot/index.js?v=20260927c"></script>
 </body>
 </html>

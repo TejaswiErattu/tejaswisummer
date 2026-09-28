@@ -1,19 +1,15 @@
 // ============================================================================
 // SYSTEM PROMPT BUILDER
 //
-// Assembled at runtime from the LIVE category and track list, so it can never
+// Assembled at runtime from the LIVE category list, so it can never
 // go stale and contains no hardcoded knowledge of this particular tracker.
 // ============================================================================
 
-import { OPERATION_NAMES, MAX_INSTANCES_PER_BATCH, MAX_QUESTIONS } from "./operations.js?v=20260916a";
+import { OPERATION_NAMES, MAX_INSTANCES_PER_BATCH, MAX_QUESTIONS } from "./operations.js?v=20260927c";
 
 export function buildSystemPrompt(ctx) {
   const categoryLines = ctx.categories
     .map(c => `  - ${c.key} : ${c.displayName}`)
-    .join("\n") || "  (none defined yet)";
-
-  const trackLines = ctx.tracks
-    .map(t => `  - ${t.key} : ${t.title}${t.dateRangeLabel ? ` (${t.dateRangeLabel})` : ""}`)
     .join("\n") || "  (none defined yet)";
 
   const seriesLines = ctx.recurringSeries.length
@@ -33,7 +29,7 @@ OUTPUT FORMAT - CRITICAL
 Respond with a single JSON object and nothing else. No prose before or after it, no
 markdown code fences. It must be exactly one of these two shapes:
 
-Shape 1 - you need more information:
+Shape 1a - you need more information from the user:
 {
   "status": "need_info",
   "partialUnderstanding": "<one or two sentences describing what you DID understand and what is missing>",
@@ -41,6 +37,15 @@ Shape 1 - you need more information:
     { "id": "<short_snake_case_id>", "question": "<the question>", "suggestions": ["<chip 1>", "<chip 2>", "<chip 3>"] }
   ]
 }
+
+Shape 1b - you need to SEE tasks outside the date window you were given:
+{
+  "status": "need_info",
+  "lookup": { "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD" },
+  "questions": []
+}
+  The app replies with a "LOOKUP RESULT" message listing those tasks (at most ~2 months
+  per lookup), then you continue. Do not ask the user for task ids - look them up.
 
 Shape 2 - you are confident and ready:
 {
@@ -51,7 +56,7 @@ Shape 2 - you are confident and ready:
 
 WHEN YOU MUST ASK INSTEAD OF GUESSING
 Return "need_info" whenever ANY of these is unclear for a task you are being asked to create:
-  1. WHICH CATEGORY OR TRACK it belongs to - when the wording matches more than one
+  1. WHICH CATEGORY it belongs to - when the wording matches more than one
      existing category, or matches none of them.
   2. HOW OFTEN it repeats - when the user used a vague word such as "regularly",
      "a few times", "throughout", "often", "periodically", or "here and there".
@@ -75,21 +80,21 @@ Every operation object MUST include a "reason" field: one plain-English sentence
 shown to the user in the change preview.
 
 { "op": "add_task", "title": string, "category": <category key>, "date": "YYYY-MM-DD",
-  "estimatedMinutes"?: number, "notes"?: string, "track"?: string, "reason": string }
+  "estimatedMinutes"?: number, "notes"?: string, "reason": string }
 
 { "op": "add_recurring_task", "title": string, "category": <category key>,
   "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD",
   "recurrence": { "type": "daily" | "weekly" | "interval",
                   "daysOfWeek"?: ["mon","thu"],   // required when type is "weekly"
                   "everyNDays"?: 3 },              // required when type is "interval"
-  "estimatedMinutes"?: number, "notes"?: string, "track"?: string, "reason": string }
+  "estimatedMinutes"?: number, "notes"?: string, "reason": string }
 
 { "op": "add_milestone", "title": string, "category": <category key>, "date": "YYYY-MM-DD",
   "notes"?: string, "reason": string }
   // Use for deadlines and due dates. Renders differently from a normal task.
 
 { "op": "update_task", "taskId": string,
-  "changes": { "title"?, "category"?, "date"?, "estimatedMinutes"?, "notes"?, "track"? },
+  "changes": { "title"?, "category"?, "date"?, "estimatedMinutes"?, "notes"? },
   "reason": string }
 
 { "op": "move_task", "taskId": string, "newDate": "YYYY-MM-DD", "reason": string }
@@ -106,9 +111,9 @@ shown to the user in the change preview.
 
 { "op": "add_project", "name": string, "targetDate": "YYYY-MM-DD",
   "subtasks"?: [string], "reason": string }
-
-{ "op": "add_subsection", "key": <lowercase_snake_case>, "title": string,
-  "dateRangeLabel"?: string, "reason": string }
+  // Creates one 2-hour "projects" task per subtask (or one task if no subtasks),
+  // spread evenly from tomorrow to targetDate, and a project card that tracks
+  // their completion. Do NOT also add_task the same subtasks.
 
 HARD RULES
 - Dates must be real calendar dates in YYYY-MM-DD form. Today is ${ctx.today}.
@@ -117,21 +122,32 @@ HARD RULES
 - "category" MUST be one of the existing keys listed below, OR a key you create with
   add_category earlier in the SAME operations array.
 - "taskId" and "seriesId" must be real ids taken from the context you were given.
-  Never invent one. If you cannot find the task the user means, ask which one.
+  Never invent one.
+- WHERE TASK IDS COME FROM:
+    tasks              every task from taskWindow.start to taskWindow.end, as
+                       { id, date, title, category, minutes, completed, fixed }.
+                       "Delete everything on <date>" or "move tomorrow's tasks" means
+                       the rows with that date - use their ids directly.
+    recentlyDiscussed  { id, title, date } for tasks touched earlier in this chat
+                       ("that one", "the task you just added").
+    matchedTasks       keyword matches from anywhere in the plan.
+    LOOKUP RESULT      tasks you requested with Shape 1b.
+  If the user refers to dates outside taskWindow and matchedTasks doesn't cover
+  them, use Shape 1b to look them up. Ask the user which task they mean only when
+  several real tasks fit.
+- Tasks with "fixed": true are commitments (exams, meetings, events). Only change
+  them when the user clearly means that exact task.
 - A single batch may not create more than ${MAX_INSTANCES_PER_BATCH} task instances. If the
   request would exceed that, return need_info and ask the user to narrow the range.
 - Prefer the fewest operations that accomplish the request. Use add_recurring_task
   rather than many add_task operations.
-- Only create a new category or subsection when nothing existing is a sensible fit.
+- Only create a new category when nothing existing is a sensible fit.
 - Moving a recurring meeting to a different weekday means: delete_recurring_series with
   scope "future_only" from today, then add_recurring_task on the new weekday. Never
   silently leave both.
 
 EXISTING CATEGORIES (use these keys verbatim)
 ${categoryLines}
-
-EXISTING TRACKS
-${trackLines}
 
 EXISTING RECURRING SERIES
 ${seriesLines}

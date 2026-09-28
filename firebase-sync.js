@@ -6,7 +6,6 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let currentUser = null;
-let isSyncing = false;
 
 // ── SIGN IN / OUT ─────────────────────────────────────────────
 function signInWithGoogle() {
@@ -28,12 +27,21 @@ async function signOutFirebase() {
   // Push any debounced change up before the session ends. js/auth-gate.js wipes
   // local progress right after sign-out, so anything not flushed here is lost.
   try {
-    if (currentUser) await saveStateToFirestore();
+    if (currentUser) {
+      if (typeof _saveTimer !== "undefined") clearTimeout(_saveTimer);
+      await saveStateToFirestore();
+    }
   } catch (e) {
     console.error("Pre-sign-out flush failed:", e);
   }
   auth.signOut().then(() => {
     showAuthToast("Signed out. Progress is safe in your Google account.", "info");
+  }).catch(err => {
+    console.error("Sign-out error:", err);
+    // Otherwise auth-gate keeps treating the next null-auth event as this
+    // sign-out and purges local progress.
+    if (window.authGate) window.authGate.cancelSignOut();
+    showAuthToast("❌ Sign-out failed. You're still signed in — try again.", "error");
   });
 }
 
@@ -46,78 +54,242 @@ auth.onAuthStateChanged(async (user) => {
     // User just signed in — load their cloud state
     showAuthToast("Loading your cloud save...", "info");
     await loadStateFromFirestore();
-    if (typeof migrateScheduleIfNeeded === "function") {
-      migrateScheduleIfNeeded(); // upgrade older cloud schedules (adds Palana onboarding prep)
-    }
-    if (typeof maybeAutoRepairRollover === "function") {
-      maybeAutoRepairRollover(); // one-time fix for old multi-day rollover damage (cloud state)
-    }
-    if (typeof applyCategoryColors === "function") {
-      applyCategoryColors(); // sync edited category colors from cloud state into CSS vars
-    }
+    stateReady = true;
+    runStatePipeline();
+    saveState();
     initUI();
+    window.__appStateLoaded = true;
+    window.dispatchEvent(new Event("app:state-loaded"));
     showAuthToast(`Synced ☁️ Welcome back, ${user.displayName?.split(' ')[0] || 'hacker'}!`, "success");
   }
 });
 
-// ── SAVE TO FIRESTORE ─────────────────────────────────────────
-async function saveStateToFirestore() {
-  if (!currentUser || isSyncing) return;
-  isSyncing = true;
-  try {
+// ── SYNC BOOKKEEPING ──────────────────────────────────────────
+// Merge rule and cloud layout: see js/sync-core.js.
+const SYNC_LOCAL_KEY = "cyber_sync_state_v1";   // { uid, lastSyncedAt }
+const MAX_PIECE_CHARS = 900000;                  // stay under Firestore's 1 MiB/doc
+
+// What this device last saw in the cloud, so only changed months get written.
+let cloudCache = { meta: null, root: null, months: {}, notes: null, legacy: false };
+let saveInFlight = null;
+let saveAgain = false;
+let syncStatus = "synced";
+
+function readSyncLocal() {
+  try { return JSON.parse(localStorage.getItem(SYNC_LOCAL_KEY)) || {}; } catch (e) { return {}; }
+}
+function getLastSyncedAt() {
+  const s = readSyncLocal();
+  return currentUser && s.uid === currentUser.uid ? (s.lastSyncedAt || 0) : 0;
+}
+function setLastSyncedAt(ms) {
+  if (!currentUser) return;
+  try { localStorage.setItem(SYNC_LOCAL_KEY, JSON.stringify({ uid: currentUser.uid, lastSyncedAt: ms })); } catch (e) {}
+}
+
+function setSyncStatus(status) {
+  syncStatus = status;
+  const el = document.getElementById("sync-indicator");
+  if (!el) return;
+  const labels = { synced: "Synced", saving: "Saving…", offline: "Offline", error: "Sync error" };
+  el.dataset.state = status;
+  el.textContent = labels[status] || status;
+  el.title = status === "offline" ? "Changes are saved on this device and will upload when you're back online."
+    : status === "error" ? "Cloud save failed. Changes are saved on this device."
+    : "";
+}
+window.setSyncStatus = setSyncStatus;
+
+function isOfflineError(e) {
+  return (typeof navigator !== "undefined" && navigator.onLine === false) ||
+    (e && (e.code === "unavailable" || e.code === "deadline-exceeded"));
+}
+
+function userRef() { return db.collection("users").doc(currentUser.uid); }
+
+// Reads the full cloud copy. Returns { state, pieces, legacy } or null.
+async function readCloud(rootSnap) {
+  const snap = rootSnap || await userRef().get({ source: "server" });
+  if (!snap.exists) return null;
+  const data = snap.data();
+  if (data.schema === SyncCore.SCHEMA) {
+    const keys = Array.isArray(data.months) ? data.months : [];
+    const monthSnaps = await Promise.all(keys.map(m => userRef().collection("months").doc(m).get({ source: "server" })));
+    const notesSnap = await userRef().collection("notes").doc("main").get({ source: "server" });
+    const pieces = {
+      meta: data.meta || null,
+      root: data.root || "{}",
+      months: {},
+      notes: notesSnap.exists ? notesSnap.data().notes : "{}"
+    };
+    monthSnaps.forEach((s, i) => { if (s.exists) pieces.months[keys[i]] = s.data().days; });
+    return { state: SyncCore.join(pieces), pieces, legacy: false };
+  }
+  if (data.state) {
+    // Old single-document format: migrated by the next save, which writes the
+    // split docs and deletes the `state` field in the same batch.
+    const state = JSON.parse(data.state);
+    return { state, pieces: { meta: null, root: null, months: {}, notes: null }, legacy: true };
+  }
+  return null;
+}
+
+// Applies the merge rule between appState and a cloud copy. Returns the choice.
+function reconcileWithCloud(cloud) {
+  const choice = SyncCore.decide(appState, cloud && cloud.state, getLastSyncedAt(), cloud && cloud.legacy);
+  if (cloud) {
+    cloudCache = { meta: cloud.pieces.meta, root: cloud.pieces.root, months: cloud.pieces.months, notes: cloud.pieces.notes, legacy: cloud.legacy };
+  }
+  if (choice === "cloud") {
+    appState = cloud.state;
+    setLastSyncedAt(cloud.state.meta ? cloud.state.meta.updatedAt : 0);
+  } else if (choice === "merge") {
+    appState = SyncCore.merge(appState, cloud.state, Date.now(), SyncCore.getDeviceId(localStorage));
+  }
+  if (choice !== "local") {
+    if (typeof resetTaskFingerprints === "function") resetTaskFingerprints();
     const { rolloverUndoSnapshot, ...persistable } = appState;
-    await db.collection("users").doc(currentUser.uid).set({
-      state: JSON.stringify(persistable),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      displayName: currentUser.displayName,
-      email: currentUser.email
-    });
-  } catch (e) {
-    console.error("Firebase save error:", e.code, e.message);
-    if (e.code === "permission-denied") {
-      showAuthToast("☁️ Cloud blocked by Firestore rules — see setup. Saved locally.", "error");
-    } else {
-      showAuthToast("Cloud save failed. Progress still saved locally.", "error");
+    localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(persistable));
+  }
+  return choice;
+}
+
+// ── SAVE TO FIRESTORE ─────────────────────────────────────────
+// Never drops a save: a call made while one is in flight marks the state dirty
+// and the running save loops once more when it finishes. The returned promise
+// settles after every queued pass is done (signOutFirebase relies on this).
+function saveStateToFirestore() {
+  if (!currentUser) return Promise.resolve();
+  if (saveInFlight) { saveAgain = true; return saveInFlight; }
+  saveInFlight = (async () => {
+    do {
+      saveAgain = false;
+      await writeOnce();
+    } while (saveAgain && currentUser);
+  })().finally(() => { saveInFlight = null; });
+  return saveInFlight;
+}
+
+async function writeOnce() {
+  setSyncStatus("saving");
+  try {
+    // A server read first: it fails fast when offline (instead of a write that
+    // hangs until reconnect) and tells us whether another device saved since
+    // our last sync, in which case we merge before overwriting anything.
+    const rootSnap = await userRef().get({ source: "server" });
+    const cloudTs = rootSnap.exists && rootSnap.data().meta ? rootSnap.data().meta.updatedAt || 0 : 0;
+    const cachedTs = cloudCache.meta ? cloudCache.meta.updatedAt || 0 : 0;
+    if (rootSnap.exists && (cloudTs !== cachedTs || rootSnap.data().state)) {
+      const cloud = await readCloud(rootSnap);
+      const choice = reconcileWithCloud(cloud);
+      if (choice !== "local" && stateReady) {
+        if (typeof runStatePipeline === "function") runStatePipeline();
+        if (typeof initUI === "function") initUI();
+      }
+      if (choice === "cloud") { setSyncStatus("synced"); return; }
     }
-  } finally {
-    isSyncing = false;
+
+    const pieces = SyncCore.split(appState);
+    const tooBig = [pieces.root, pieces.notes].concat(Object.values(pieces.months)).some(s => s.length > MAX_PIECE_CHARS);
+    if (tooBig) throw Object.assign(new Error("A sync document is over the size limit."), { code: "too-large" });
+
+    const dirtyMonths = Object.keys(pieces.months).filter(m => pieces.months[m] !== cloudCache.months[m]);
+    const notesDirty = pieces.notes !== cloudCache.notes;
+    const metaTs = pieces.meta ? pieces.meta.updatedAt : 0;
+    const rootDirty = cloudCache.legacy || pieces.root !== cloudCache.root || metaTs !== cachedTs ||
+      !rootSnap.exists || JSON.stringify(Object.keys(pieces.months)) !== JSON.stringify((rootSnap.data() || {}).months || []);
+    if (!rootDirty && !notesDirty && dirtyMonths.length === 0) { setSyncStatus("synced"); return; }
+
+    const batch = db.batch();
+    const ts = firebase.firestore.FieldValue.serverTimestamp();
+    dirtyMonths.forEach(m => batch.set(userRef().collection("months").doc(m), { days: pieces.months[m], updatedAt: ts }));
+    if (notesDirty) batch.set(userRef().collection("notes").doc("main"), { notes: pieces.notes, updatedAt: ts });
+    const rootDoc = {
+      schema: SyncCore.SCHEMA,
+      meta: pieces.meta || { updatedAt: 0, deviceId: SyncCore.getDeviceId(localStorage) },
+      root: pieces.root,
+      months: Object.keys(pieces.months),
+      displayName: currentUser.displayName || null,
+      email: currentUser.email || null,
+      updatedAt: ts
+    };
+    if (rootSnap.exists && rootSnap.data().state !== undefined) rootDoc.state = firebase.firestore.FieldValue.delete();
+    batch.set(userRef(), rootDoc, { merge: true });
+    await batch.commit();
+
+    cloudCache = { meta: rootDoc.meta, root: pieces.root, months: Object.assign({}, cloudCache.months, pieces.months), notes: pieces.notes, legacy: false };
+    setLastSyncedAt(metaTs);
+    setSyncStatus(saveAgain ? "saving" : "synced");
+  } catch (e) {
+    if (isOfflineError(e)) {
+      setSyncStatus("offline");
+    } else {
+      console.error("Firebase save error:", e.code, e.message);
+      setSyncStatus("error");
+      if (e.code === "permission-denied") {
+        showAuthToast("☁️ Cloud blocked by Firestore rules — see setup. Saved locally.", "error");
+      } else if (e.code === "too-large") {
+        showAuthToast("Cloud save failed: data too large. Saved locally.", "error");
+      } else {
+        showAuthToast("Cloud save failed. Progress still saved locally.", "error");
+      }
+    }
+    saveAgain = false; // retried on the next save, on reconnect, or on focus
   }
 }
 
 // ── LOAD FROM FIRESTORE ───────────────────────────────────────
 async function loadStateFromFirestore() {
   if (!currentUser) return;
+  cloudCache = { meta: null, root: null, months: {}, notes: null, legacy: false };
   try {
-    const doc = await db.collection("users").doc(currentUser.uid).get();
-    const countTasks = (s) => (s?.days || []).reduce((n, d) => n + (d.tasks?.length || 0), 0);
-    const countDone  = (s) => (s?.days || []).reduce((n, d) => n + (d.tasks?.filter(t => t.completed).length || 0), 0);
-
-    if (doc.exists && doc.data().state) {
-      const cloudState = JSON.parse(doc.data().state);
-      const cloudTasks = countTasks(cloudState);
-      const localTasks = countTasks(appState);
-
-      if (cloudTasks === 0 && localTasks === 0) {
-        // Both empty — generate fresh and upload
-        generateNewState();
-        await saveStateToFirestore();
-      } else if (cloudTasks === 0 || countDone(cloudState) < countDone(appState)) {
-        // Cloud is empty or behind local — keep local, repair cloud
-        await saveStateToFirestore();
-      } else {
-        // Cloud has data — use it
-        appState = cloudState;
-        localStorage.setItem("cyber_study_plan_state_2026", JSON.stringify(appState));
-      }
-    } else {
-      // No cloud doc — upload local (or generate if also empty)
-      if (countTasks(appState) === 0) generateNewState();
-      await saveStateToFirestore();
-    }
+    const cloud = await readCloud();
+    const localTasks = (appState?.days || []).reduce((n, d) => n + (d.tasks?.length || 0), 0);
+    if (!cloud && localTasks === 0) generateNewState();
+    reconcileWithCloud(cloud);
+    setSyncStatus("synced");
   } catch (e) {
     console.error("Firebase load error:", e);
+    setSyncStatus(isOfflineError(e) ? "offline" : "error");
     showAuthToast("Cloud load failed. Using local save.", "error");
   }
+}
+
+// Pick up another device's changes when this tab comes back into view or the
+// connection returns. A local unsynced edit is merged, never overwritten.
+async function pullIfRemoteChanged() {
+  if (!currentUser || !stateReady || saveInFlight) return;
+  try {
+    const rootSnap = await userRef().get({ source: "server" });
+    const data = rootSnap.exists ? rootSnap.data() : null;
+    const cloudTs = data && data.meta ? data.meta.updatedAt || 0 : 0;
+    const cachedTs = cloudCache.meta ? cloudCache.meta.updatedAt || 0 : 0;
+    const localTs = appState.meta ? appState.meta.updatedAt || 0 : 0;
+    if (data && cloudTs !== cachedTs) {
+      const choice = reconcileWithCloud(await readCloud(rootSnap));
+      if (choice !== "local") { runStatePipeline(); initUI(); }
+      if (choice !== "cloud") await saveStateToFirestore();
+      else setSyncStatus("synced");
+    } else if (localTs > getLastSyncedAt()) {
+      await saveStateToFirestore();
+    } else {
+      setSyncStatus("synced");
+    }
+  } catch (e) {
+    setSyncStatus(isOfflineError(e) ? "offline" : "error");
+  }
+}
+window.pullIfRemoteChanged = pullIfRemoteChanged;
+
+if (typeof window.addEventListener === "function") {
+  window.addEventListener("online", () => { pullIfRemoteChanged(); });
+  window.addEventListener("offline", () => { if (currentUser) setSyncStatus("offline"); });
+  window.addEventListener("focus", () => { pullIfRemoteChanged(); });
+}
+if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") pullIfRemoteChanged();
+  });
 }
 
 // ── AUTH UI ───────────────────────────────────────────────────
@@ -133,8 +305,10 @@ function updateAuthUI(user) {
     bar.classList.add("auth-signed");
     signInBtn.classList.add("hidden");
     signOutBtn.classList.remove("hidden");
-    userInfo.innerText = `${user.displayName || user.email} — progress synced across all devices ☁️`;
+    userInfo.innerText = `${user.displayName || user.email}`;
     userInfo.classList.remove("hidden");
+    const ind = document.getElementById("sync-indicator");
+    if (ind) ind.classList.remove("hidden");
     if (avatar) {
       avatar.src = user.photoURL || "";
       avatar.classList.toggle("hidden", !user.photoURL);
@@ -146,6 +320,8 @@ function updateAuthUI(user) {
     signOutBtn.classList.add("hidden");
     userInfo.innerText = "";
     userInfo.classList.add("hidden");
+    const ind = document.getElementById("sync-indicator");
+    if (ind) ind.classList.add("hidden");
     if (avatar) avatar.classList.add("hidden");
   }
 }

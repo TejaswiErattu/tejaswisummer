@@ -1,12 +1,45 @@
 rules_version = '2';
 
 // Firestore security rules for the Cyber Study Plan tracker.
-// Each signed-in user can read & write ONLY their own document under /users/{uid}.
-// This is secure (no public access) and works with Google Sign-In.
+// Each signed-in user can read & write ONLY their own data under /users/{uid}:
+//   users/{uid}                  settings, categories, extracurriculars, meta
+//   users/{uid}/months/{YYYY-MM} that month's days
+//   users/{uid}/notes/main       task notes
+// Writes are shape-checked and size-capped below Firestore's 1 MiB/doc limit.
+// The legacy `state` field is not allowed back in, so a stale tab running the
+// old single-document code can't overwrite the split layout.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function data() { return request.resource.data; }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && data().keys().hasOnly(['schema', 'meta', 'root', 'months', 'displayName', 'email', 'updatedAt'])
+        && data().schema == 2
+        && data().meta is map
+        && data().meta.updatedAt is number
+        && data().root is string && data().root.size() <= 900000
+        && data().months is list && data().months.size() <= 60;
+
+      match /months/{month} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && month.matches('^[0-9]{4}-[0-9]{2}$')
+          && data().keys().hasOnly(['days', 'updatedAt'])
+          && data().days is string && data().days.size() <= 900000;
+      }
+
+      match /notes/{docId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && docId == 'main'
+          && data().keys().hasOnly(['notes', 'updatedAt'])
+          && data().notes is string && data().notes.size() <= 900000;
+      }
     }
   }
 }

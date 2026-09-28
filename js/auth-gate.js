@@ -17,7 +17,10 @@
   var LOCAL_STATE_KEY = "cyber_study_plan_state_2026";
   // Chatbot undo/audit entries embed whole-day task lists, completion flags and
   // all, so they have to go too or "signed out" would still leak progress.
-  var SNAPSHOT_KEYS = ["chatbot_undo_stack_v1", "chatbot_history_v1"];
+  var SNAPSHOT_KEYS = ["chatbot_undo_stack_v1", "chatbot_history_v1", "chatbot_anthropic_api_key", "chatbot_settings_v1", "chatbot_ui_state_v1"];
+  var SESSION_KEYS = ["chatbot_google_session"];
+  // Sync bookkeeping (lastSyncedAt) belongs to the signed-out user's copy.
+  var SYNC_KEYS = ["cyber_sync_state_v1"];
 
   var AUTH_TIMEOUT_MS = 12000;
 
@@ -65,19 +68,48 @@
     SNAPSHOT_KEYS.forEach(function (k) {
       try { localStorage.removeItem(k); } catch (e) {}
     });
+    SYNC_KEYS.forEach(function (k) {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
+    SESSION_KEYS.forEach(function (k) {
+      try { sessionStorage.removeItem(k); } catch (e) {}
+    });
   }
 
   // --- auth wiring ----------------------------------------------------------
 
-  function onAuthResolved(user) {
+  function settle() {
     resolved = true;
     if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+  }
 
+  function armTimeout() {
+    resolved = false;
+    if (timeoutId) return;
+    timeoutId = setTimeout(function () {
+      timeoutId = null;
+      if (resolved) return;
+      lock();
+      showError("Still waiting on Google sign-in. Check your connection, then reload.");
+    }, AUTH_TIMEOUT_MS);
+  }
+
+  // Unlock only once firebase-sync.js has picked cloud vs local and migrated
+  // it; unlocking on the user alone flashed stale local progress first.
+  function onStateLoaded() {
+    if (!firebase.auth().currentUser) return;
+    settle();
+    clearError();
+    unlock();
+  }
+
+  function onAuthResolved(user) {
     if (user) {
-      clearError();
-      unlock();
+      setState("checking");
+      armTimeout();
       return;
     }
+    settle();
 
     // Signed out after clicking Sign Out: the cloud copy is already flushed by
     // signOutFirebase(), so drop every local trace and reload. The reload is the
@@ -132,13 +164,16 @@
       showError("Couldn't verify your session: " + (err && err.code ? err.code : "unknown error"));
     });
 
-    // Stay locked if auth never answers, but say why instead of spinning forever.
-    timeoutId = setTimeout(function () {
-      if (resolved) return;
-      lock();
-      showError("Still waiting on Google sign-in. Check your connection, then reload.");
-    }, AUTH_TIMEOUT_MS);
+    window.addEventListener("app:state-loaded", onStateLoaded);
+    if (window.__appStateLoaded) onStateLoaded();
+
+    // Stay locked if auth or the state load never answers, but say why.
+    armTimeout();
   }
+
+  window.authGate = {
+    cancelSignOut: function () { explicitSignOut = false; }
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

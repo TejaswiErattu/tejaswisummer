@@ -15,7 +15,7 @@ export const API_KEY_STORAGE_KEY = "chatbot_anthropic_api_key";
 // Adding a model later is a one-line change here.
 export const MODELS = [
   { id: "claude-sonnet-5",           label: "Sonnet 5 (default, balanced)", inputPerMTok: 2, outputPerMTok: 10 },
-  { id: "claude-haiku-4-5-20251001", label: "Haiku 4.5 (cheapest)",         inputPerMTok: 1, outputPerMTok: 5 },
+  { id: "claude-haiku-4-5",           label: "Haiku 4.5 (cheapest)",         inputPerMTok: 1, outputPerMTok: 5 },
   { id: "claude-opus-5",             label: "Opus 5 (most accurate, pricey)", inputPerMTok: 5, outputPerMTok: 25 }
 ];
 
@@ -40,6 +40,17 @@ export function loadSettings() {
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
+}
+
+// A proxy URL must parse and use https:. Plain http: is only for a proxy on
+// this machine (wrangler dev). Returns null when fine, else a message.
+export function validateProxyUrl(value) {
+  let u;
+  try { u = new URL(String(value || "").trim()); } catch { return "That isn't a valid URL."; }
+  const local = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]" || u.hostname === "::1";
+  if (u.protocol === "https:") return null;
+  if (u.protocol === "http:" && local) return null;
+  return "The proxy URL must start with https:// (http:// is only allowed for localhost).";
 }
 
 export function saveSettings(patch) {
@@ -74,12 +85,13 @@ export class ChatbotApiError extends Error {
   constructor(kind, message, detail) {
     super(message);
     this.name = "ChatbotApiError";
-    this.kind = kind;      // no_key | auth | rate_limit | overloaded | network | bad_request | unknown
+    this.kind = kind;      // no_key | auth | forbidden | rate_limit | overloaded | network | bad_request | unknown
     this.detail = detail;  // never contains the API key
   }
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const MAX_RETRY_AFTER_SECONDS = 30;
 
 // --- The call ---------------------------------------------------------------
 // messages: [{ role: "user"|"assistant", content: string }]
@@ -96,6 +108,10 @@ export async function callModel({ system, messages, signal, onRetry }) {
     throw new ChatbotApiError("no_key",
       "Proxy mode is on but no proxy URL is set. Open settings and add your Worker URL, or switch back to direct mode.");
   }
+  if (usingProxy) {
+    const urlProblem = validateProxyUrl(settings.proxyUrl);
+    if (urlProblem) throw new ChatbotApiError("bad_request", `Proxy URL rejected: ${urlProblem}`);
+  }
 
   const body = {
     model: settings.model,
@@ -109,9 +125,13 @@ export async function callModel({ system, messages, signal, onRetry }) {
 
   if (usingProxy) {
     // Mode B: no Anthropic key ever leaves this browser. The Worker holds it.
-    // We send the Google ID token so the Worker can verify who is calling.
-    const idToken = getIdTokenForProxy();
-    if (idToken) headers["authorization"] = `Bearer ${idToken}`;
+    // We send the Firebase ID token (auto-refreshed by the Firebase SDK) so
+    // the Worker can verify who is calling.
+    const idToken = await getIdTokenForProxy();
+    if (!idToken) {
+      throw new ChatbotApiError("auth", "You're not signed in, so the proxy can't verify you. Sign in again.");
+    }
+    headers["authorization"] = `Bearer ${idToken}`;
   } else {
     // Mode A: the key goes in a header, and only in a header.
     headers["x-api-key"] = getApiKey();
@@ -120,7 +140,10 @@ export async function callModel({ system, messages, signal, onRetry }) {
   }
 
   const MAX_ATTEMPTS = 3;
+  const MAX_TOKENS_CEILING = 8192;
   let lastErr = null;
+  let truncationRetried = false;
+  const usageTotal = { input_tokens: 0, output_tokens: 0 };
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     let res;
@@ -149,22 +172,40 @@ export async function callModel({ system, messages, signal, onRetry }) {
         .filter(b => b.type === "text")
         .map(b => b.text)
         .join("");
+      usageTotal.input_tokens += (json.usage && json.usage.input_tokens) || 0;
+      usageTotal.output_tokens += (json.usage && json.usage.output_tokens) || 0;
+
+      // Cut off by the output limit: retry once with double max_tokens (up to
+      // 8192). If it still truncates, hand the text back flagged so the caller
+      // can tell the user. This doesn't use up one of the network/5xx attempts.
+      if (json.stop_reason === "max_tokens" && !truncationRetried && body.max_tokens < MAX_TOKENS_CEILING) {
+        truncationRetried = true;
+        body.max_tokens = Math.min(body.max_tokens * 2, MAX_TOKENS_CEILING);
+        onRetry?.(attempt, "truncated");
+        attempt -= 1;
+        continue;
+      }
       return {
         text,
-        usage: json.usage || { input_tokens: 0, output_tokens: 0 },
-        model: json.model || settings.model
+        usage: usageTotal,
+        model: json.model || settings.model,
+        truncated: json.stop_reason === "max_tokens"
       };
     }
 
     // --- Non-OK responses ---
     const detail = await safeErrorText(res);
 
-    if (res.status === 401 || res.status === 403) {
+    if (usingProxy && res.status === 401) {
       throw new ChatbotApiError("auth",
-        usingProxy
-          ? "The proxy rejected this request (401). Your Google sign-in may have expired, or your email is not on the proxy's allowlist."
-          : "Your API key was rejected. Check it in settings.",
-        detail);
+        "Your sign-in has expired or is invalid. Sign in to the tracker again, then retry.", detail);
+    }
+    if (usingProxy && res.status === 403) {
+      throw new ChatbotApiError("forbidden",
+        "The proxy refused this request: this site's origin or your email isn't on its allowlist. Check ALLOWED_ORIGINS and ALLOWED_EMAILS on the Worker.", detail);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new ChatbotApiError("auth", "Your API key was rejected. Check it in settings.", detail);
     }
 
     if (res.status === 429) {
@@ -173,7 +214,7 @@ export async function callModel({ system, messages, signal, onRetry }) {
       if (attempt < MAX_ATTEMPTS) {
         const retryAfter = Number(res.headers.get("retry-after"));
         const wait = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
+          ? Math.min(retryAfter, MAX_RETRY_AFTER_SECONDS) * 1000
           : 1000 * 2 ** (attempt - 1);
         onRetry?.(attempt, "rate_limit");
         await sleep(wait);
@@ -209,8 +250,9 @@ async function safeErrorText(res) {
 }
 
 // Set by auth.js so api.js has no import cycle with it.
-let _idTokenGetter = () => null;
+// The getter may be async (Firebase's getIdToken refreshes an expired token).
+let _idTokenGetter = async () => null;
 export function registerIdTokenGetter(fn) { _idTokenGetter = fn; }
-function getIdTokenForProxy() {
-  try { return _idTokenGetter(); } catch { return null; }
+async function getIdTokenForProxy() {
+  try { return await _idTokenGetter(); } catch { return null; }
 }

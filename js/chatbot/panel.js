@@ -5,10 +5,15 @@
 // host-app DOM; all host interaction goes through adapter.js.
 // ============================================================================
 
-import { MODELS, loadSettings, saveSettings, getApiKey, setApiKey, hasApiKey, getModel } from "./api.js?v=20260916a";
+import { MODELS, loadSettings, saveSettings, getApiKey, setApiKey, hasApiKey, getModel, validateProxyUrl } from "./api.js?v=20260927c";
 
 const UI_KEY = "chatbot_ui_state_v1";
 const NARROW_BREAKPOINT = 1100;
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 640;
+const clampWidth = (w) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));
+let uidCounter = 0;
+const nextUid = (prefix) => `${prefix}-${++uidCounter}`;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
@@ -29,7 +34,7 @@ function saveUi(patch) {
 
 export class ChatbotPanel {
   constructor(handlers) {
-    this.h = handlers;              // { onSend, onApply, onCancel, onUndo, onAnswerChips, onSignOut }
+    this.h = handlers;              // { onSend, onApply, onCancel, onUndo, onAnswerChips, onAbort, onSignOut }
     this.ui = loadUi();
     this.locked = true;
     this.pending = null;            // pending batch awaiting Apply
@@ -96,6 +101,7 @@ export class ChatbotPanel {
     fab.id = "chatbot-fab";
     fab.className = "cb-fab";
     fab.title = "Open assistant (Ctrl/Cmd + K)";
+    fab.setAttribute("aria-label", "Open assistant");
     fab.innerHTML = "💬";
     document.body.appendChild(fab);
     this.fab = fab;
@@ -114,6 +120,7 @@ export class ChatbotPanel {
       else if (act === "send") this._submit();
       else if (act === "undo") this.h.onUndo?.();
       else if (act === "signout") this.h.onSignOut?.();
+      else if (act === "abort") this.h.onAbort?.();
       else if (act === "apply") this._apply();
       else if (act === "cancel") this._cancel();
     });
@@ -128,41 +135,83 @@ export class ChatbotPanel {
     this.refreshFooter();
   }
 
+  // Width is set through one function so the pointer drag, the arrow keys and
+  // the saved value all agree, and so the page layout can follow it
+  // (--cb-panel-w, used by body.cb-panel-open in chatbot.css).
+  _setWidth(w, persist) {
+    const width = clampWidth(Math.round(w));
+    this.root.style.width = `${width}px`;
+    document.documentElement.style.setProperty("--cb-panel-w", `${width}px`);
+    const handle = this.root.querySelector(".cb-resize-handle");
+    if (handle) handle.setAttribute("aria-valuenow", String(width));
+    if (persist) this.ui = saveUi({ width });
+    return width;
+  }
+
   _wireResize() {
     const handle = this.root.querySelector(".cb-resize-handle");
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", "vertical");
+    handle.setAttribute("aria-label", "Resize assistant panel (arrow keys)");
+    handle.setAttribute("aria-valuemin", String(MIN_WIDTH));
+    handle.setAttribute("aria-valuemax", String(MAX_WIDTH));
+    handle.tabIndex = 0;
+
+    // Pointer events cover mouse, touch and pen; capture keeps the drag alive
+    // when the pointer leaves the 6px handle.
     let startX = 0, startW = 0, dragging = false;
-    handle.addEventListener("mousedown", (e) => {
+    handle.addEventListener("pointerdown", (e) => {
       dragging = true; startX = e.clientX; startW = this.root.offsetWidth;
+      handle.setPointerCapture(e.pointerId);
       document.body.style.userSelect = "none";
       e.preventDefault();
     });
-    window.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      const w = Math.min(640, Math.max(300, startW + (startX - e.clientX)));
-      this.root.style.width = `${w}px`;
+    handle.addEventListener("pointermove", (e) => {
+      if (dragging) this._setWidth(startW + (startX - e.clientX), false);
     });
-    window.addEventListener("mouseup", () => {
+    const end = (e) => {
       if (!dragging) return;
       dragging = false;
       document.body.style.userSelect = "";
-      this.ui = saveUi({ width: this.root.offsetWidth });
+      try { handle.releasePointerCapture(e.pointerId); } catch {}
+      this._setWidth(this.root.offsetWidth, true);
+    };
+    handle.addEventListener("pointerup", end);
+    handle.addEventListener("pointercancel", end);
+
+    // The panel sits on the right, so Left widens it and Right narrows it.
+    handle.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 60 : 20;
+      let w = null;
+      if (e.key === "ArrowLeft") w = this.root.offsetWidth + step;
+      else if (e.key === "ArrowRight") w = this.root.offsetWidth - step;
+      else if (e.key === "Home") w = MIN_WIDTH;
+      else if (e.key === "End") w = MAX_WIDTH;
+      if (w === null) return;
+      e.preventDefault();
+      this._setWidth(w, true);
     });
   }
 
+  // Ctrl/Cmd+K opens the panel, but only once it is unlocked, and never while
+  // the user is typing somewhere (inputs, textareas, selects, editable text),
+  // so it can't hijack a browser or page shortcut mid-edit.
   _wireGlobalKeys() {
     window.addEventListener("keydown", (e) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && (e.key === "k" || e.key === "K")) {
-        e.preventDefault();
-        this.setOpen(true);
-        if (!this.locked) this.el.input.focus();
-      }
+      if (!mod || (e.key !== "k" && e.key !== "K")) return;
+      if (this.locked) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      this.setOpen(true);
+      this.el.input.focus();
     });
   }
 
   // --- open / collapse ------------------------------------------------------
   _applyUiState() {
-    this.root.style.width = `${this.ui.width}px`;
+    this._setWidth(this.ui.width, false);
     this.setOpen(this.ui.open, true);
   }
 
@@ -208,11 +257,11 @@ export class ChatbotPanel {
   renderSettings() {
     const cfg = loadSettings();
     const key = getApiKey();
-    const masked = key ? `${key.slice(0, 7)}…${key.slice(-4)}` : "";
+    const id = (n) => `cb-set-${n}`;
     this.el.settings.innerHTML = `
       <div class="cb-set-row">
-        <label>Mode</label>
-        <select data-set="mode">
+        <label for="${id("mode")}">Mode</label>
+        <select id="${id("mode")}" data-set="mode">
           <option value="direct" ${cfg.mode === "direct" ? "selected" : ""}>A · Direct browser call</option>
           <option value="proxy" ${cfg.mode === "proxy" ? "selected" : ""}>B · Proxy endpoint</option>
         </select>
@@ -220,26 +269,27 @@ export class ChatbotPanel {
 
       <div class="cb-set-block" data-when="direct" ${cfg.mode === "direct" ? "" : "hidden"}>
         <div class="cb-set-row">
-          <label>Anthropic API key</label>
-          <input type="password" data-set="apiKey" autocomplete="off" spellcheck="false"
-                 placeholder="${key ? esc(masked) : "sk-ant-…"}">
+          <label for="${id("apiKey")}">Anthropic API key</label>
+          <input type="password" id="${id("apiKey")}" data-set="apiKey" autocomplete="off" spellcheck="false"
+                 placeholder="sk-ant-…">
         </div>
+        ${key ? `<p class="cb-note">A key is stored in this browser. Type a new one above to replace it.</p>` : ""}
         <p class="cb-warn">⚠ Your key is stored in this browser only. Do not use this mode on a shared computer.</p>
         ${key ? `<button class="cb-linkbtn cb-danger" data-set-act="clearKey">Remove stored key</button>` : ""}
       </div>
 
       <div class="cb-set-block" data-when="proxy" ${cfg.mode === "proxy" ? "" : "hidden"}>
         <div class="cb-set-row">
-          <label>Proxy URL</label>
-          <input type="url" data-set="proxyUrl" value="${esc(cfg.proxyUrl)}"
+          <label for="${id("proxyUrl")}">Proxy URL</label>
+          <input type="url" id="${id("proxyUrl")}" data-set="proxyUrl" value="${esc(cfg.proxyUrl)}"
                  placeholder="https://your-worker.workers.dev">
         </div>
         <p class="cb-note">No API key is sent from this browser in proxy mode. The proxy holds it.</p>
       </div>
 
       <div class="cb-set-row">
-        <label>Model</label>
-        <select data-set="model">
+        <label for="${id("model")}">Model</label>
+        <select id="${id("model")}" data-set="model">
           ${MODELS.map(m => `<option value="${esc(m.id)}" ${cfg.model === m.id ? "selected" : ""}>${esc(m.label)} · $${m.inputPerMTok}/$${m.outputPerMTok} per MTok</option>`).join("")}
         </select>
       </div>
@@ -257,6 +307,8 @@ export class ChatbotPanel {
       s.querySelector('[data-when="proxy"]').hidden = mode !== "proxy";
     });
 
+    if (s._clickWired) return;
+    s._clickWired = true;
     s.addEventListener("click", (e) => {
       const b = e.target.closest("[data-set-act]");
       if (!b) return;
@@ -272,6 +324,10 @@ export class ChatbotPanel {
         const mode = s.querySelector('[data-set="mode"]').value;
         const model = s.querySelector('[data-set="model"]').value;
         const proxyUrl = s.querySelector('[data-set="proxyUrl"]')?.value.trim() || "";
+        if (mode === "proxy") {
+          const problem = validateProxyUrl(proxyUrl);
+          if (problem) { this.addSystem(`Settings not saved: ${problem}`); return; }
+        }
         const keyInput = s.querySelector('[data-set="apiKey"]');
         // Only overwrite the stored key if the field was actually typed into,
         // so re-saving settings doesn't wipe an existing key.
@@ -327,11 +383,13 @@ export class ChatbotPanel {
     this.root.querySelector('[data-act="send"]').disabled = !!on;
     if (on) {
       if (!this._busyNode) {
-        this._busyNode = document.createElement("div");
-        this._busyNode.className = "cb-msg cb-msg-busy";
-        this._append(this._busyNode);
+        const node = document.createElement("div");
+        node.className = "cb-msg cb-msg-busy";
+        node.innerHTML = `<span class="cb-busy-label"></span> <button class="cb-linkbtn" data-act="abort" type="button">Cancel</button>`;
+        this._busyNode = node;
+        this._append(node);
       }
-      this._busyNode.textContent = label || "Thinking…";
+      this._busyNode.querySelector(".cb-busy-label").textContent = label || "Thinking…";
     } else if (this._busyNode) {
       this._busyNode.remove();
       this._busyNode = null;
@@ -339,8 +397,25 @@ export class ChatbotPanel {
   }
 
   // --- clarification chips --------------------------------------------------
-  askQuestions(questions, partialUnderstanding) {
+  askQuestions(rawQuestions, partialUnderstanding) {
     if (partialUnderstanding) this.addBot(partialUnderstanding);
+
+    // The model's questions are untrusted: keep well-formed ones, give every
+    // question a unique id (a missing or repeated id would make answers
+    // overwrite each other), and only accept an array of strings as chips.
+    const seen = new Set();
+    const questions = (Array.isArray(rawQuestions) ? rawQuestions : [])
+      .filter(q => q && typeof q === "object" && typeof q.question === "string" && q.question.trim())
+      .map((q, i) => {
+        let id = typeof q.id === "string" && q.id.trim() ? q.id.trim() : `q${i + 1}`;
+        while (seen.has(id)) id = `${id}_${i + 1}`;
+        seen.add(id);
+        const suggestions = Array.isArray(q.suggestions)
+          ? q.suggestions.filter(x => typeof x === "string" && x.trim()).slice(0, 4)
+          : [];
+        return { id, question: q.question, suggestions };
+      });
+    if (!questions.length) { this.focusInput(); return null; }
 
     const wrap = document.createElement("div");
     wrap.className = "cb-questions";
@@ -349,11 +424,23 @@ export class ChatbotPanel {
     questions.forEach(q => {
       const block = document.createElement("div");
       block.className = "cb-q";
-      block.innerHTML = `<div class="cb-q-text">${esc(q.question)}</div>`;
+      block.setAttribute("role", "group");
+      const freeId = nextUid("cb-q-free");
+      const labelId = nextUid("cb-q-label");
+      // The question text is the visible label of the "type your own" field.
+      const label = document.createElement("label");
+      label.className = "cb-q-text";
+      label.id = labelId;
+      label.htmlFor = freeId;
+      label.textContent = q.question;
+      block.setAttribute("aria-labelledby", labelId);
+      block.appendChild(label);
+
       const chips = document.createElement("div");
       chips.className = "cb-chips";
-      (q.suggestions || []).forEach(sug => {
+      q.suggestions.forEach(sug => {
         const chip = document.createElement("button");
+        chip.type = "button";
         chip.className = "cb-chip";
         chip.textContent = sug;
         chip.addEventListener("click", () => {
@@ -367,6 +454,7 @@ export class ChatbotPanel {
       block.appendChild(chips);
 
       const free = document.createElement("input");
+      free.id = freeId;
       free.className = "cb-q-free";
       free.placeholder = "or type your own…";
       free.addEventListener("input", () => {
@@ -383,6 +471,7 @@ export class ChatbotPanel {
     });
 
     const submitBtn = document.createElement("button");
+    submitBtn.type = "button";
     submitBtn.className = "cb-btn cb-btn-primary";
     submitBtn.textContent = "Send answers";
     submitBtn.disabled = true;

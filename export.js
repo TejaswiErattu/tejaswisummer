@@ -31,8 +31,17 @@
 
   async function ensureLibs() {
     if (typeof window.ExcelJS === "undefined") await loadScript(EXCELJS_CDN);
-    if (typeof window.saveAs === "undefined") await loadScript(FILESAVER_CDN);
     if (typeof window.ExcelJS === "undefined") throw new Error("ExcelJS unavailable");
+    // FileSaver is a convenience: if it fails to load or doesn't define saveAs,
+    // downloads fall back to an <a download> link (see saveBlob).
+    if (typeof window.saveAs !== "function") {
+      try { await loadScript(FILESAVER_CDN); } catch (e) { console.warn("[export] FileSaver unavailable, using fallback download:", e.message); }
+    }
+  }
+
+  function saveBlob(blob, name) {
+    if (typeof window.saveAs === "function") window.saveAs(blob, name);
+    else fallbackDownload(blob, name);
   }
 
   // ── Date / plan constants (fall back to locals if app globals are missing) ──
@@ -40,10 +49,6 @@
   const END = (typeof END_DATE_STR !== "undefined") ? END_DATE_STR : "2026-09-01";
   const INDIA_S = (typeof INDIA_START_STR !== "undefined") ? INDIA_START_STR : "2026-06-24";
   const INDIA_E = (typeof INDIA_END_STR !== "undefined") ? INDIA_END_STR : "2026-07-08";
-  const INFO_S = (typeof INFO_START_STR !== "undefined") ? INFO_START_STR : "2026-06-22";
-  const INFO_E = (typeof INFO_END_STR !== "undefined") ? INFO_END_STR : "2026-08-21";
-  const AWS_EXAM_TARGET = "2026-06-23";
-  const SECPLUS_EXAM_TARGET = "2026-08-20";
 
   // ── Small date helpers ─────────────────────────────────────────────────────
   function pd(str) {
@@ -58,6 +63,13 @@
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const d = String(date.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
+  }
+  // Calendar-day arithmetic: setDate keeps local midnight across DST changes
+  // (adding n * 86400000 ms lands an hour off on Nov 1).
+  function addDays(str, n) {
+    const d = pd(str);
+    d.setDate(d.getDate() + n);
+    return fmt(d);
   }
   function dayDiff(aStr, bStr) {
     return Math.round((pd(bStr) - pd(aStr)) / 86400000);
@@ -76,7 +88,7 @@
     awscp: "AWS Cloud Practitioner", jobapps: "Job Applications",
     interviews: "Interviews", hackathons: "Hackathons",
     projects: "Cybersecurity Projects", leetcode: "LeetCode Blind 75", ahf: "AHF Tech Lead",
-    info310: "INFO 310 Class", palana: "Palana Preparation", palana_security: "Palana Security",
+    palana: "Palana Preparation", palana_security: "Palana Security",
     github: "Git Developer Tool", winfo: "WINFO", mentor: "Mentor Meetings",
     travel: "Travel", catchup: "Catch-Up", personal: "Personal", custom: "Custom"
   };
@@ -84,8 +96,8 @@
     if (typeof window.getCategoryLabel === "function") return window.getCategoryLabel(id);
     return CAT_LABEL[id] || id;
   }
-  const ROUTINE_CATS = ["ahf", "leetcode", "info310", "palana", "github", "custom"];
-  const OPTIONAL_CATS = ["projects", "github", "palana", "custom"];
+  const ROUTINE_CATS = ["ahf", "leetcode", "jobapps", "palana", "github", "custom"];
+  const OPTIONAL_CATS = ["projects", "github", "palana", "custom", "hackathons", "interviews"];
 
   // ── Status & risk color palette (ARGB for ExcelJS) ──────────────────────────
   const STATUS_FILL = {
@@ -127,6 +139,24 @@
       .replace(" (Rolled Over)", "").trim();
   }
 
+  // Task notes live in appState.taskNotes[taskId]: an object (text,
+  // plannedOutcome, actualOutcome, learned, blockers, nextStep, links) or, in
+  // older saves, a plain string. Non-empty parts are joined, labelled.
+  function noteTextFor(taskId) {
+    const n = (S().taskNotes || {})[taskId];
+    if (!n) return "";
+    if (typeof n === "string") return n.trim();
+    return [
+      n.text,
+      n.plannedOutcome && "Planned: " + n.plannedOutcome,
+      n.actualOutcome && "Actual: " + n.actualOutcome,
+      n.learned && "Learned: " + n.learned,
+      n.blockers && "Blockers: " + n.blockers,
+      n.nextStep && "Next: " + n.nextStep,
+      n.links && "Links: " + n.links
+    ].filter(x => x && String(x).trim()).map(x => String(x).trim()).join("\n");
+  }
+
   // Flatten every task with its day context.
   function flatTasks() {
     const out = [];
@@ -136,19 +166,51 @@
     return out;
   }
 
+  // ── Exams, derived from the plan ───────────────────────────────────────────
+  // An exam task carries exam:true. Older saved tasks without the flag are
+  // recognised by category + "Certification Exam" in the title.
+  const EXAM_CATS = ["aws", "secplus", "awscp"];
+  const EXAM_NAME = { aws: "AWS AI Practitioner", secplus: "CompTIA Security+", awscp: "AWS Cloud Practitioner" };
+  function isExamTask(t) {
+    if (!t || EXAM_CATS.indexOf(t.category) === -1) return false;
+    return t.exam === true || (t.exam == null && /Certification Exam/i.test(t.title || ""));
+  }
+  // { aws: { date, completed, completedOn } | undefined, ... }. If a category has
+  // more than one exam task (e.g. a retired copy that was completed), the
+  // unfinished one is the live target; otherwise the latest one.
+  let _examCache = null; // reset at the start of each export/preview run
+  function examInfo() {
+    if (_examCache) return _examCache;
+    const out = {};
+    flatTasks().forEach(({ t, day }) => {
+      if (!isExamTask(t)) return;
+      const cur = out[t.category];
+      const cand = { date: day.date, completed: !!t.completed, completedOn: t.completedOnDate || (t.completed ? day.date : null) };
+      if (!cur || (cur.completed && !cand.completed) || (cur.completed === cand.completed && cand.date > cur.date)) out[t.category] = cand;
+    });
+    _examCache = out;
+    return out;
+  }
+  // Earliest exam that is still ahead of (or on) the plan day.
+  function nextExam() {
+    const today = exportPlanToday();
+    const info = examInfo();
+    return EXAM_CATS.map(c => info[c] && !info[c].completed && info[c].date >= today ? { cat: c, date: info[c].date } : null)
+      .filter(Boolean).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+  }
+
   // ── Derivations ────────────────────────────────────────────────────────────
   function phaseFor(dateStr) {
-    if (dateStr > END) return "Overflow (At Risk)";
-    if (dateStr >= "2026-08-22") return "Phase 3 · Projects & Portfolio";
-    if (dateStr >= "2026-07-09") return "Phase 2 · Security+ Core";
-    if (dateStr >= INDIA_S && dateStr <= INDIA_E) return "India Trip · Light Load";
-    return "Phase 1 · AWS + PortSwigger Sprint";
+    const m = +dateStr.slice(5, 7);
+    if (m >= 6 && m <= 8) return "Summer (Jun–Aug)";
+    if (m >= 9 && m <= 12) return "Fall (Sep–Dec)";
+    return "Outside plan";
   }
 
   function deriveStatus(t, dayStr) {
     if (t.completed) return "Completed";
     const today = exportPlanToday();
-    const rolled = /Rolled Over/i.test(t.title || "");
+    const rolled = !!t.rolledFrom;
     if (rolled) return "Rescheduled";
     if (dayStr < today) {
       return ROUTINE_CATS.indexOf(t.category) !== -1 ? "Skipped" : "Overdue";
@@ -160,18 +222,22 @@
   // Original / current scheduled dates + reschedule count from the ledger.
   function rescheduleInfo(t, dayStr) {
     const led = (S().rescheduleLedger || {})[cleanTitle(t.title)];
-    const count = led ? (led.count || 0) : (/Rolled Over/i.test(t.title || "") ? 1 : 0);
+    const count = led ? (led.count || 0) : (t.rolledFrom ? 1 : 0);
     const original = (t.originalDate) || (led && led.originalDate) || dayStr;
     return { count, original, current: dayStr, movedFrom: led ? led.lastMovedFrom : null };
   }
 
+  // High: past due, moved twice or more, past the plan's end, or an exam-track
+  // task scheduled after its own exam. Medium: moved once, or an exam-track task
+  // in the last 7 days before its exam. Otherwise Low.
   function riskLevel(t, dayStr, status) {
     if (status === "Completed") return "";
-    const today = exportPlanToday();
-    const daysToDeadline = dayDiff(today, END);
     const ri = rescheduleInfo(t, dayStr);
+    const exam = examInfo()[t.category];
     if (dayStr > END || status === "Overdue" || ri.count >= 2) return "High";
-    if (ri.count === 1 || dayStr > "2026-08-18" || daysToDeadline <= 10) return "Medium";
+    if (exam && !exam.completed && !isExamTask(t) && dayStr > exam.date) return "High";
+    if (ri.count === 1) return "Medium";
+    if (exam && !exam.completed && dayStr <= exam.date && dayDiff(dayStr, exam.date) <= 7) return "Medium";
     return "Low";
   }
 
@@ -226,7 +292,6 @@
     const c = t.category;
     if (c === "ahf" && !opt.includeAHF) return false;
     if (c === "palana" && !opt.includePalana) return false;
-    if (c === "info310" && !opt.includeInfo310) return false;
     if (c === "leetcode" && !opt.includeLeetcode) return false;
     if ((c === "projects" || c === "github") && !opt.includeOptional) return false;
     if (c === "awscp" && !opt.includeAwsCp) return false;
@@ -239,11 +304,8 @@
   }
 
   function weekWindow(dateStr) {
-    const wn = weekNumber(dateStr);
-    const startOffset = (wn - 1) * 7;
-    const ws = fmt(new Date(pd(START).getTime() + startOffset * 86400000));
-    const we = fmt(new Date(pd(START).getTime() + (startOffset + 6) * 86400000));
-    return { ws, we };
+    const startOffset = (weekNumber(dateStr) - 1) * 7;
+    return { ws: addDays(START, startOffset), we: addDays(START, startOffset + 6) };
   }
 
   function dateInScope(dateStr, opt) {
@@ -273,7 +335,6 @@
       const planned = t.duration || 0;
       const completedDur = t.completed ? planned : 0;
       rows.push({
-        _status: status,
         date: pd(day.date),
         dateStr: day.date,
         dow: weekday(day.date),
@@ -298,7 +359,7 @@
         resourceLink: t.link || "",
         timing: completionTiming(t, day.date),
         risk: riskLevel(t, day.date, status),
-        notes: opt.includeNotes ? (t.notes || "") : ""
+        notes: opt.includeNotes ? noteTextFor(t.id) : ""
       });
     });
     rows.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || a.title.localeCompare(b.title));
@@ -334,7 +395,7 @@
         const w = weekWindow(day.date);
         weeks[wn] = {
           week: wn, ws: w.ws, we: w.we, planned: 0, completed: 0, tasksPlanned: 0, tasksCompleted: 0,
-          leetcode: 0, portswigger: 0, secplus: 0, aws: 0, info310: 0, ahf: 0, palana: 0, project: 0
+          leetcode: 0, portswigger: 0, secplus: 0, aws: 0, ahf: 0, palana: 0, project: 0
         };
       }
       const wk = weeks[wn];
@@ -347,15 +408,12 @@
         if (t.category === "portswigger") wk.portswigger += 1;
         if (t.category === "secplus") wk.secplus += 1;
         if (t.category === "aws") wk.aws += 1;
-        if (t.category === "info310") wk.info310 += t.duration || 0;
         if (t.category === "ahf") wk.ahf += t.duration || 0;
         if (t.category === "palana") wk.palana += t.duration || 0;
         if (t.category === "projects") wk.project += t.duration || 0;
       }
     });
     return Object.values(weeks).sort((a, b) => a.week - b.week).map(w => ({
-      _status: w.planned > 0 && w.completed / w.planned >= 0.999 ? "Completed"
-        : (w.completed > 0 ? "Partial" : "Not Started"),
       week: w.week,
       start: pd(w.ws), end: pd(w.we),
       planned: round1(w.planned), completed: round1(w.completed),
@@ -363,101 +421,93 @@
       bar: bar(w.planned > 0 ? w.completed / w.planned : 0, 16),
       tasksPlanned: w.tasksPlanned, tasksCompleted: w.tasksCompleted,
       leetcode: w.leetcode, portswigger: w.portswigger, secplus: w.secplus, aws: w.aws,
-      info310: round1(w.info310), ahf: round1(w.ahf), palana: round1(w.palana), project: round1(w.project),
-      reflection: opt.includeNotes ? "" : ""
+      ahf: round1(w.ahf), palana: round1(w.palana), project: round1(w.project)
     }));
   }
 
   // ── LeetCode 75 cross-reference ────────────────────────────────────────────
   function buildLeetcode() {
     const list = (typeof BLIND_75_QUESTIONS !== "undefined") ? BLIND_75_QUESTIONS : [];
-    // Index scheduled leetcode tasks by problem id.
+    // Index scheduled leetcode tasks by Blind 75 seq (same mapping as the
+    // dashboard metric: OA tasks count only if their LC number is on the list).
     const sched = {};
     flatTasks().forEach(({ t, day }) => {
       if (t.category !== "leetcode") return;
-      const id = t.leetcodeId;
-      if (id == null) return;
-      if (!sched[id] || t.completed) sched[id] = { day: day.date, completed: t.completed, completedOn: t.completedOnDate };
+      const seq = (typeof blind75SeqOf === "function") ? blind75SeqOf(t) : t.blind75Seq;
+      if (!seq) return;
+      if (!sched[seq] || t.completed) sched[seq] = { day: day.date, completed: t.completed, completedOn: t.completedOnDate };
     });
     return list.map(q => {
-      const s = sched[q.id] || {};
+      const s = sched[q.seq] || {};
       const status = s.completed ? "Completed" : (s.day ? (s.day < exportPlanToday() ? "Skipped" : (s.day === exportPlanToday() ? "In Progress" : "Not Started")) : "Not Started");
       return {
-        _status: status,
-        name: q.name, num: q.id, topic: q.category || "", difficulty: difficultyFor(q),
+        name: q.name, num: q.lc, topic: q.category || "", difficulty: q.difficulty || "",
         scheduled: s.day ? pd(s.day) : null,
         completedDate: s.completedOn ? pd(s.completedOn) : null,
         status: status, attempts: "", timeSpent: "", solution: q.link || "", notes: ""
       };
     });
   }
-  function difficultyFor(q) {
-    const hard = ["Minimum Window Substring", "Word Ladder", "Median of Two Sorted Arrays", "Largest Rectangle", "Serialize", "Word Search II", "Trapping Rain Water", "Find Median", "Longest Increasing Path"];
-    const easy = ["Two Sum", "Valid Palindrome", "Valid Anagram", "Contains Duplicate", "Best Time to Buy and Sell Stock", "Reverse Linked List", "Merge Two Sorted Lists", "Invert Binary Tree", "Maximum Depth", "Same Tree", "Valid Parentheses", "Climbing Stairs", "Linked List Cycle"];
-    if (hard.some(h => (q.name || "").indexOf(h) !== -1)) return "Hard";
-    if (easy.some(h => (q.name || "").indexOf(h) !== -1)) return "Easy";
-    return "Medium";
-  }
 
   // ── Projects ───────────────────────────────────────────────────────────────
+  // Dated projects (p.dated) are measured by the tasks tagged with their
+  // projectId: start = first scheduled task date, target = p.dueDate. The
+  // original summer projects (not dated) are matched to tasks by name and only
+  // count as active when selected in Settings.
+  function projectStatus(pct, doneHours) {
+    return pct >= 0.999 ? "Completed" : (doneHours > 0 ? "In Progress" : "Not Started");
+  }
   function buildProjects() {
     const out = [];
     const projDefs = (typeof TRACK_4_PROJECTS !== "undefined") ? TRACK_4_PROJECTS : [];
     const selected = (S().settings && S().settings.selectedProjects) || [];
-    // Completed hours per project, matched by task name.
-    const doneHoursByTitle = {};
-    flatTasks().forEach(({ t }) => {
-      if (t.completed) doneHoursByTitle[cleanTitle(t.title)] = (doneHoursByTitle[cleanTitle(t.title)] || 0) + (t.duration || 0);
-    });
+    const all = flatTasks();
 
     projDefs.forEach(p => {
-      const isSel = selected.indexOf(p.id) !== -1;
-      let completed = 0;
-      (p.tasks || []).forEach(tk => { completed += doneHoursByTitle[cleanTitle(tk.name)] || 0; });
-      const pct = p.totalHours > 0 ? completed / p.totalHours : 0;
+      let mine, planned, completed, isSel = true;
+      if (p.dated) {
+        mine = all.filter(({ t }) => t.projectId === p.id);
+        planned = mine.reduce((n, { t }) => n + (t.duration || 0), 0);
+        completed = mine.reduce((n, { t }) => n + (t.completed ? (t.duration || 0) : 0), 0);
+      } else {
+        isSel = selected.indexOf(p.id) !== -1;
+        const names = {};
+        (p.tasks || []).forEach(tk => { names[cleanTitle(tk.name)] = true; });
+        mine = all.filter(({ t }) => names[cleanTitle(t.title)]);
+        planned = p.totalHours || 0;
+        completed = mine.reduce((n, { t }) => n + (t.completed ? (t.duration || 0) : 0), 0);
+      }
+      const dates = mine.map(({ day }) => day.date).sort();
+      const pct = planned > 0 ? completed / planned : 0;
+      const status = !isSel ? "Skipped (not selected)" : projectStatus(pct, completed);
       out.push({
-        _status: !isSel ? "Skipped" : (pct >= 0.999 ? "Completed" : (completed > 0 ? "In Progress" : "Not Started")),
-        name: p.name, type: "Cybersecurity Project", description: p.desc,
-        status: !isSel ? "Skipped (not selected)" : (pct >= 0.999 ? "Completed" : (completed > 0 ? "In Progress" : "Not Started")),
+        name: p.name, type: p.dated ? "Dated Project" : "Cybersecurity Project", description: p.desc,
+        status: status,
         priority: isSel ? "Required" : "Optional",
-        start: pd("2026-08-22"), target: pd(END),
-        planned: p.totalHours, completed: round1(completed), remaining: round1(Math.max(0, p.totalHours - completed)),
-        github: "", demo: "", skills: deriveSkills(p), deliverables: (p.tasks || []).length + " modules",
-        portfolio: pct >= 0.999 ? "Yes" : "No", notes: ""
+        start: dates.length ? pd(dates[0]) : null,
+        target: p.dueDate ? pd(p.dueDate) : (dates.length ? pd(dates[dates.length - 1]) : null),
+        planned: round1(planned), completed: round1(completed), remaining: round1(Math.max(0, planned - completed)),
+        github: "", demo: "", skills: deriveSkills(p),
+        deliverables: p.dated ? mine.length + " scheduled tasks" : (p.tasks || []).length + " modules",
+        portfolio: isSel && pct >= 0.999 ? "Yes" : "No", notes: ""
       });
     });
 
-    // GitHub extension passion project (from github category tasks).
-    const gh = catStats(t => t.category === "github");
-    if (gh.plannedCount > 0) {
-      out.push({
-        _status: gh.pct >= 0.999 ? "Completed" : (gh.completedHours > 0 ? "In Progress" : "Not Started"),
-        name: "GitHub Extension (Beginner/Pro Tool)", type: "Passion Project",
-        description: "Browser/IDE extension making GitHub friendlier for beginners and pros — built with a friend.",
-        status: gh.pct >= 0.999 ? "Completed" : (gh.completedHours > 0 ? "In Progress" : "Not Started"),
-        priority: "Optional", start: pd(START), target: pd(END),
-        planned: gh.plannedHours, completed: gh.completedHours, remaining: round1(gh.plannedHours - gh.completedHours),
-        github: "https://github.com/", demo: "", skills: "JavaScript, GitHub API, UX", deliverables: "Published extension",
-        portfolio: gh.pct >= 0.999 ? "Yes" : "No", notes: ""
-      });
-    }
-
-    // Palana security project (if enabled).
+    // Palana security work (if enabled), dated from its own tasks.
+    const palTasks = all.filter(({ t }) => t.category === "palana");
     const pal = catStats(t => t.category === "palana");
     if (S().settings && S().settings.palanaEnabled && pal.plannedCount > 0) {
+      const dates = palTasks.map(({ day }) => day.date).sort();
       out.push({
-        _status: pal.completedHours > 0 ? "In Progress" : "Not Started",
         name: "Palana Safety Engineering", type: "Professional Work",
         description: "Safety-engineering onboarding prep and ongoing work blocks (position pending).",
         status: pal.completedHours > 0 ? "In Progress" : "Not Started",
-        priority: "Optional", start: pd(START), target: pd(END),
+        priority: "Optional", start: pd(dates[0]), target: pd(dates[dates.length - 1]),
         planned: pal.plannedHours, completed: pal.completedHours, remaining: round1(pal.plannedHours - pal.completedHours),
         github: "", demo: "", skills: "Safety domain, compliance, engineering", deliverables: "Onboarding readiness",
         portfolio: "No", notes: ""
       });
     }
-
-    // Any user-added custom 'projects' tasks not part of the canonical defs.
     return out;
   }
   function deriveSkills(p) {
@@ -472,20 +522,15 @@
   }
 
   // ── Certifications ─────────────────────────────────────────────────────────
-  function awsStatus() {
-    const st = S().settings || {};
-    if (st.awsExamPassed) return "Passed";
-    const examDone = flatTasks().some(({ t }) => t.category === "aws" && /Certification Exam/i.test(t.title) && t.completed);
-    if (examDone) return "Passed";
-    return byCat("aws").completedCount > 0 ? "In Progress" : "Not Started";
+  function certStatus(cat, passedFlag) {
+    if (passedFlag) return "Passed";
+    const ex = examInfo()[cat];
+    if (ex && ex.completed) return "Passed";
+    return byCat(cat).completedCount > 0 ? "In Progress" : "Not Started";
   }
-  function secStatus() {
-    const st = S().settings || {};
-    if (st.securityPlusExamPassed) return "Passed";
-    const examDone = flatTasks().some(({ t }) => t.category === "secplus" && /Certification Exam/i.test(t.title) && t.completed);
-    if (examDone) return "Passed";
-    return byCat("secplus").completedCount > 0 ? "In Progress" : "Not Started";
-  }
+  function awsStatus() { return certStatus("aws", (S().settings || {}).awsExamPassed); }
+  function secStatus() { return certStatus("secplus", (S().settings || {}).securityPlusExamPassed); }
+  function awscpStatus() { return certStatus("awscp", (S().settings || {}).awscpExamPassed); }
 
   // ── Resources library ──────────────────────────────────────────────────────
   function buildResources(opt) {
@@ -515,13 +560,13 @@
     return out.map(r => ({
       category: r.category, title: r.title, description: r.description, url: r.url,
       related: r.related, status: seen[r._ref].anyDone ? "Completed" : "Not Started",
-      _status: seen[r._ref].anyDone ? "Completed" : "Not Started",
       notes: ""
     }));
   }
 
   // ── Master data gather ─────────────────────────────────────────────────────
   function gather(opt) {
+    _examCache = null;
     const schedule = buildScheduleRows(opt);
     const completed = schedule.filter(r => r.status === "Completed");
     const unfinished = schedule.filter(r => r.status !== "Completed");
@@ -530,13 +575,18 @@
     const totalCompleted = round1(flatTasks().reduce((s, x) => s + (x.t.completed ? (x.t.duration || 0) : 0), 0));
     const allTaskCount = flatTasks().length;
     const completedCount = flatTasks().filter(x => x.t.completed).length;
-    const atRisk = (S().days || []).some(d => d.isOverflow);
+    // At risk: an unfinished exam-track task is already past due, or a day
+    // overflowed the plan. Measured against the next upcoming exam (else plan end).
+    const upcoming = nextExam();
+    const target = upcoming ? { name: EXAM_NAME[upcoming.cat], date: upcoming.date } : { name: "Plan End", date: END };
 
     const statusCounts = { Completed: 0, Overdue: 0, Skipped: 0, Rescheduled: 0, "In Progress": 0, "Not Started": 0 };
     flatTasks().forEach(({ t, day }) => {
       const stt = deriveStatus(t, day.date);
       if (statusCounts[stt] != null) statusCounts[stt] += 1;
     });
+    const atRisk = (S().days || []).some(d => d.isOverflow) ||
+      flatTasks().some(({ t, day }) => EXAM_CATS.indexOf(t.category) !== -1 && !isExamTask(t) && deriveStatus(t, day.date) === "Overdue");
 
     const summary = {
       planStart: START, deadline: END, planToday: exportPlanToday(), downloadDate: fmt(new Date()),
@@ -545,10 +595,11 @@
       completedCount, unfinishedCount: allTaskCount - completedCount, partialCount: partialGroupCount(),
       skippedCount: statusCounts.Skipped, rescheduledCount: statusCounts.Rescheduled, overdueCount: statusCounts.Overdue,
       secplus: byCat("secplus"), aws: byCat("aws"), portswigger: byCat("portswigger"),
-      leetcode: byCat("leetcode"), info310: byCat("info310"), ahf: byCat("ahf"),
+      leetcode: byCat("leetcode"), ahf: byCat("ahf"), awscp: byCat("awscp"),
       palana: byCat("palana"), projects: byCat("projects"), github: byCat("github"),
       onTrack: !atRisk, atRisk,
-      categories: ["portswigger", "aws", "awscp", "secplus", "leetcode", "info310", "ahf", "palana", "github", "projects", "jobapps", "interviews", "hackathons", "winfo", "mentor"].map(c => ({
+      onTrackLabel: `On Track for ${target.name} (${target.date})?`,
+      categories: ["portswigger", "aws", "awscp", "secplus", "leetcode", "ahf", "palana", "github", "projects", "jobapps", "interviews", "hackathons", "winfo", "mentor"].map(c => ({
         cat: CAT_LABEL[c], stats: byCat(c)
       })).filter(x => x.stats.plannedCount > 0)
     };
@@ -557,7 +608,8 @@
       opt, summary, schedule, completed, unfinished,
       weekly: buildWeekly(opt), leetcode: buildLeetcode(), projects: buildProjects(),
       resources: opt.includeResources ? buildResources(opt) : [],
-      certs: { aws: awsStatus(), sec: secStatus(), awsStats: byCat("aws"), secStats: byCat("secplus") }
+      certs: { aws: awsStatus(), sec: secStatus(), awscp: awscpStatus(),
+        awsStats: byCat("aws"), secStats: byCat("secplus"), awscpStats: byCat("awscp"), exams: examInfo() }
     };
   }
 
@@ -742,7 +794,7 @@
       return r;
     }
 
-    titleRow("CYBERSECURITY SUMMER STUDY PLAN 2026 — DASHBOARD SUMMARY");
+    titleRow("CYBERSECURITY STUDY PLAN 2026 — DASHBOARD SUMMARY");
     const meta = ws.addRow(["Generated: " + new Date().toLocaleString()]);
     ws.mergeCells(`A${meta.number}:D${meta.number}`);
     meta.getCell(1).font = { italic: true, color: { argb: "FF8A6D00" }, size: 9 };
@@ -752,7 +804,7 @@
     kv("Final Deadline", s.deadline, { type: "date" });
     kv("Current Plan Day", s.planToday, { type: "date" });
     kv("Download Date", s.downloadDate, { type: "date" });
-    kv("On Track for Sept 1?", s.onTrack ? "YES — On Track ✅" : "AT RISK ⚠️", { status: s.onTrack ? "Completed" : "Overdue" });
+    kv(s.onTrackLabel, s.onTrack ? "YES — On Track ✅" : "AT RISK ⚠️", { status: s.onTrack ? "Completed" : "Overdue" });
 
     sectionRow("◆ OVERALL PROGRESS");
     kv("Overall Completion", s.overallPct, { type: "percent", bar: s.overallPct });
@@ -770,10 +822,10 @@
 
     sectionRow("◆ CERTIFICATION & TRACK PROGRESS");
     kv("CompTIA Security+ (SY0-701)", s.secplus.pct, { type: "percent", bar: s.secplus.pct });
-    kv("AWS Cloud Practitioner", s.aws.pct, { type: "percent", bar: s.aws.pct });
+    kv("AWS AI Practitioner", s.aws.pct, { type: "percent", bar: s.aws.pct });
+    if (s.awscp.plannedCount > 0) kv("AWS Cloud Practitioner", s.awscp.pct, { type: "percent", bar: s.awscp.pct });
     kv("PortSwigger Labs", s.portswigger.pct, { type: "percent", bar: s.portswigger.pct });
     kv("LeetCode Blind 75", s.leetcode.pct, { type: "percent", bar: s.leetcode.pct });
-    kv("INFO 310 Hours Completed", s.info310.completedHours, { type: "hours" });
     kv("AHF Hours Completed", s.ahf.completedHours, { type: "hours" });
     if (S().settings && S().settings.palanaEnabled) kv("Palana Hours Completed", s.palana.completedHours, { type: "hours" });
     kv("Personal Projects", s.projects.pct, { type: "percent", bar: s.projects.pct });
@@ -802,7 +854,7 @@
     const wb = new ExcelJS.Workbook();
     wb.creator = "Cyber Study Plan Command Center";
     wb.created = new Date();
-    wb.properties.title = "Cybersecurity Summer Study Plan 2026";
+    wb.properties.title = "Cybersecurity Study Plan 2026";
     wb.properties.comments = "Exported " + new Date().toLocaleString();
 
     const plan = sheetPlan(data.opt);
@@ -831,7 +883,7 @@
         { header: "Resource", key: "resourceName", width: 26, wrap: true },
         { header: "Resource Link", key: "resourceLink", type: "link", width: 13 },
         { header: "Notes", key: "notes", width: 26, wrap: true }
-      ], data.schedule, { tabColor: "FF8B5CF6", statusKey: "status", xSplit: 1 });
+      ], data.schedule, { tabColor: "FF8B5CF6", xSplit: 1 });
     }
 
     if (plan.completed) {
@@ -846,7 +898,7 @@
         { header: "Status", key: "status", type: "status", width: 12 },
         { header: "Notes", key: "notes", width: 28, wrap: true },
         { header: "Resource Link", key: "resourceLink", type: "link", width: 13 }
-      ], data.completed.map(r => Object.assign({}, r, { _status: r.timing })), { tabColor: "FF22C55E" });
+      ], data.completed, { tabColor: "FF22C55E" });
     }
 
     if (plan.unfinished) {
@@ -865,7 +917,7 @@
       ], data.unfinished.map(r => Object.assign({}, r, {
         _reason: r.rescheduleCount > 0 ? "Carried via rollover" : (r.status === "Overdue" ? "Past due — not completed" : ""),
         _deadline: pd(END)
-      })), { tabColor: "FFF59E0B", statusKey: "status" });
+      })), { tabColor: "FFF59E0B" });
     }
 
     if (plan.weekly) {
@@ -883,12 +935,10 @@
         { header: "PortSwigger", key: "portswigger", type: "int", width: 12 },
         { header: "Sec+ Lessons", key: "secplus", type: "int", width: 12 },
         { header: "AWS Lessons", key: "aws", type: "int", width: 12 },
-        { header: "INFO 310 h", key: "info310", type: "hours", width: 11 },
         { header: "AHF h", key: "ahf", type: "hours", width: 9 },
         { header: "Palana h", key: "palana", type: "hours", width: 10 },
-        { header: "Project h", key: "project", type: "hours", width: 10 },
-        { header: "Reflection Notes", key: "reflection", width: 28, wrap: true }
-      ], data.weekly, { tabColor: "FF06B6D4", statusKey: null });
+        { header: "Project h", key: "project", type: "hours", width: 10 }
+      ], data.weekly, { tabColor: "FF06B6D4" });
     }
 
     if (plan.certs) writeCertifications(wb, data);
@@ -905,7 +955,7 @@
         { header: "Time Spent", key: "timeSpent", width: 11 },
         { header: "Solution", key: "solution", type: "link", width: 11 },
         { header: "Notes", key: "notes", width: 26, wrap: true }
-      ], data.leetcode, { tabColor: "FFA855F7", statusKey: "status" });
+      ], data.leetcode, { tabColor: "FFA855F7" });
     }
 
     if (plan.projects) {
@@ -926,7 +976,7 @@
         { header: "Deliverables", key: "deliverables", width: 18, wrap: true },
         { header: "Portfolio Ready", key: "portfolio", width: 14 },
         { header: "Notes", key: "notes", width: 24, wrap: true }
-      ], data.projects, { tabColor: "FFD946EF", statusKey: "status" });
+      ], data.projects, { tabColor: "FFD946EF" });
     }
 
     if (plan.resources && data.resources.length) {
@@ -938,7 +988,7 @@
         { header: "Related Task", key: "related", width: 36, wrap: true },
         { header: "Status", key: "status", type: "status", width: 14 },
         { header: "Notes", key: "notes", width: 24, wrap: true }
-      ], data.resources, { tabColor: "FF10B981", statusKey: "status" });
+      ], data.resources, { tabColor: "FF10B981" });
     }
 
     // ⭐ NEW: Write optional worksheets
@@ -987,14 +1037,29 @@
     }
     const statusToWord = { Passed: "Completed", "In Progress": "In Progress", "Not Started": "Not Started" };
 
-    section("AWS CERTIFIED CLOUD PRACTITIONER");
+    // Exam dates come from the plan's exam tasks (see examInfo).
+    function examRows(cat, statusWord) {
+      const ex = data.certs.exams[cat];
+      kv("Target Exam Date", ex ? ex.date : "—", null, ex ? "date" : undefined);
+      kv("Actual Exam Date", ex && ex.completed ? ex.completedOn : "—", null, ex && ex.completed ? "date" : undefined);
+      kv("Exam Status", statusWord, statusToWord[statusWord] || "Not Started");
+    }
+
+    section("AWS CERTIFIED AI PRACTITIONER");
     kv("Course Progress", data.certs.awsStats.pct, null, "percent");
     kv("Study Hours Completed", data.certs.awsStats.completedHours, null, "hours");
     kv("Practice Test Scores", "—  (log manually)");
     kv("Weak Topics", "—  (log manually)");
-    kv("Target Exam Date", AWS_EXAM_TARGET, null, "date");
-    kv("Actual Exam Date", "—");
-    kv("Exam Status", data.certs.aws, statusToWord[data.certs.aws] || "Not Started");
+    examRows("aws", data.certs.aws);
+    kv("Notes", "");
+
+    ws.addRow([]);
+    section("AWS CERTIFIED CLOUD PRACTITIONER  (CLF-C02)");
+    kv("Course Progress", data.certs.awscpStats.pct, null, "percent");
+    kv("Study Hours Completed", data.certs.awscpStats.completedHours, null, "hours");
+    kv("Practice Test Scores", "—  (log manually)");
+    kv("Weak Topics", "—  (log manually)");
+    examRows("awscp", data.certs.awscp);
     kv("Notes", "");
 
     ws.addRow([]);
@@ -1005,9 +1070,7 @@
     kv("Study Hours Completed", data.certs.secStats.completedHours, null, "hours");
     kv("Practice Test Scores", "—  (log manually)");
     kv("Weak Topics", "—  (log manually)");
-    kv("Target Exam Date", SECPLUS_EXAM_TARGET, null, "date");
-    kv("Actual Exam Date", "—");
-    kv("Exam Status", data.certs.sec, statusToWord[data.certs.sec] || "Not Started");
+    examRows("secplus", data.certs.sec);
     kv("Notes", "");
 
     ws.addRow([]);
@@ -1100,14 +1163,19 @@
     });
     
     if (mentorTasks.length === 0) return;
-    
+
     // Remove duplicates and summarize
     const summary = [];
     const seen = {};
+    const WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
     mentorTasks.forEach(t => {
-      if (!seen[t.recurring]) {
-        seen[t.recurring] = true;
-        const freq = t.recurring.includes("sunday") ? "Every Sunday" : "Every Monday";
+      const weekday = typeof t.recurring === "string"
+        ? (t.recurring.includes("sunday") ? "sunday" : "monday")
+        : WEEKDAY_NAMES[t.date.getDay()];
+      const key = t.title + "|" + weekday;
+      if (!seen[key]) {
+        seen[key] = true;
+        const freq = "Every " + weekday.charAt(0).toUpperCase() + weekday.slice(1);
         summary.push({
           frequency: freq,
           title: t.title,
@@ -1157,21 +1225,20 @@
   // ⭐ NEW: Export AHF Tasks worksheet
   function writeAHFTasks(wb, data) {
     const ahfTasks = [];
+    // Whole plan, not just the summer.
     (S().days || []).forEach(day => {
-      if (day.date >= "2026-06-15" && day.date <= "2026-08-21") {
-        (day.tasks || []).forEach(t => {
-          if (t.category === "ahf") {
-            ahfTasks.push({
-              date: pd(day.date),
-              dateStr: day.date,
-              title: t.title,
-              duration: t.duration,
-              completed: t.completed ? "✓" : "",
-              status: t.completed ? "Done" : "Pending"
-            });
-          }
-        });
-      }
+      (day.tasks || []).forEach(t => {
+        if (t.category === "ahf") {
+          ahfTasks.push({
+            date: pd(day.date),
+            dateStr: day.date,
+            title: t.title,
+            duration: t.duration,
+            completed: t.completed ? "✓" : "",
+            status: t.completed ? "Done" : "Pending"
+          });
+        }
+      });
     });
     
     if (ahfTasks.length === 0) return;
@@ -1182,7 +1249,7 @@
       { header: "Hours", key: "duration", type: "hours", width: 8 },
       { header: "Status", key: "status", type: "status", width: 12 },
       { header: "✓", key: "completed", width: 5 }
-    ], ahfTasks, { tabColor: "FFFF758C", statusKey: "status" });
+    ], ahfTasks, { tabColor: "FFFF758C" });
   }
 
   function writeTaskNotes(wb, data) {
@@ -1259,6 +1326,29 @@
     }
   }
 
+  // AHF hours come from Settings → weekly target / 7; the plan's real daily
+  // AHF durations are shown too when they differ.
+  function ahfDailyLabel(st) {
+    const target = Number(st.ahfWeeklyTarget) || 7;
+    const durs = {};
+    flatTasks().forEach(({ t }) => {
+      if (t.category === "ahf" && /(_ahf|_x_ahf)$/.test(t.id)) durs[t.duration] = (durs[t.duration] || 0) + 1;
+    });
+    const seen = Object.keys(durs).sort((a, b) => durs[b] - durs[a]).map(d => d + " h").join(" / ");
+    return round1(target / 7) + " h / day (weekly target " + target + " h)" + (seen ? " · scheduled: " + seen : "");
+  }
+  // Average scheduled LeetCode problems per calendar week, over the weeks that have any.
+  function leetcodePaceLabel() {
+    const weeks = {};
+    flatTasks().forEach(({ t, day }) => {
+      if (t.category === "leetcode") weeks[weekNumber(day.date)] = (weeks[weekNumber(day.date)] || 0) + 1;
+    });
+    const w = Object.keys(weeks);
+    if (!w.length) return "(none scheduled)";
+    const total = w.reduce((n, k) => n + weeks[k], 0);
+    return "~" + Math.round(total / w.length) + " problems / week (" + total + " over " + w.length + " weeks)";
+  }
+
   function writeSettings(wb) {
     const st = S().settings || {};
     const ws = wb.addWorksheet("Settings & Availability", {
@@ -1272,20 +1362,21 @@
       ["Travel-Day Capacity (India)", "2–3 h"],
       ["Maximum Daily Capacity", (st.maxNormalDailyHours || 8) + " h"],
       ["India Travel Dates", INDIA_S + "  →  " + INDIA_E],
-      ["AHF Daily Hours", "1.0 h / day (every day)"],
+      ["AHF Daily Hours", ahfDailyLabel(st)],
       ["Palana Enabled", st.palanaEnabled ? "Yes" : "No"],
       ["Palana Daily Hours", "Mon–Thu 1.5 h · Fri 2.0 h (prep window: up to 3 h)"],
-      ["INFO 310 Window", INFO_S + "  →  " + INFO_E + "  (weekdays · 1 h)"],
-      ["GitHub Extension Weekly Hours", "2 h / week (Saturdays)"],
-      ["LeetCode Weekly Target", "~6 problems / week (1/day, Sun rest)"],
-      ["AWS Target Exam Date", AWS_EXAM_TARGET],
-      ["Security+ Target Exam Date", SECPLUS_EXAM_TARGET],
+      ["LeetCode Weekly Pace", leetcodePaceLabel()],
+      ["Palana Security Role", st.palanaSecurityEnabled === false ? "Off" : "On"]
+    ].concat(EXAM_CATS.map(c => {
+      const ex = examInfo()[c];
+      return [EXAM_NAME[c] + " Exam Date", ex ? ex.date + (ex.completed ? " (done)" : "") : "(none scheduled)"];
+    })).concat([
       ["Selected Projects", (st.selectedProjects || []).join(", ") || "(none)"],
       ["Final Deadline", END],
       ["Schedule Version", String(st.scheduleVersion != null ? st.scheduleVersion : "—")],
       ["Last Rollover Day", st.lastRolloverDay || "(none)"],
       ["Export Timestamp", new Date().toLocaleString()]
-    ];
+    ]);
     rows.forEach((rr, idx) => {
       const r = ws.addRow(rr);
       r.getCell(1).font = { bold: true, color: { argb: "FF2A1240" } };
@@ -1301,7 +1392,7 @@
 
   // ── Filenames ──────────────────────────────────────────────────────────────
   function fileBase() {
-    return "Cybersecurity_Summer_Study_Plan_" + fmt(new Date());
+    return "Cybersecurity_Study_Plan_" + fmt(new Date());
   }
 
   // ── Export meta (last export label) ────────────────────────────────────────
@@ -1334,7 +1425,7 @@
     const wb = await buildWorkbook(data);
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    saveAs(blob, fileBase() + ".xlsx");
+    saveBlob(blob, fileBase() + ".xlsx");
     writeMeta({ lastExcel: isoTime() });
     if (typeof playSynthSound === "function") playSynthSound("success");
     return data;
@@ -1365,8 +1456,7 @@
     );
     const csv = "\uFEFF" + [header].concat(lines).join("\r\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    if (typeof window.saveAs === "function") saveAs(blob, fileBase() + ".csv");
-    else fallbackDownload(blob, fileBase() + ".csv");
+    saveBlob(blob, fileBase() + ".csv");
     writeMeta({ lastCsv: isoTime() });
     if (typeof playSynthSound === "function") playSynthSound("click");
     return data;
@@ -1374,7 +1464,8 @@
   function _csvDate(key) { return (r) => r[key] instanceof Date ? fmt(r[key]) : ""; }
   function csvCell(v) {
     if (v == null) return "";
-    const s = String(v);
+    let s = String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function fallbackDownload(blob, name) {
@@ -1393,7 +1484,6 @@
       rangeEnd: opt.rangeEnd || END,
       includeAHF: opt.includeAHF !== false,
       includePalana: opt.includePalana !== false,
-      includeInfo310: opt.includeInfo310 !== false,
       includeLeetcode: opt.includeLeetcode !== false,
       includeOptional: opt.includeOptional !== false,
       includeAwsCp: opt.includeAwsCp !== false,
@@ -1410,6 +1500,7 @@
   // ── Preview ────────────────────────────────────────────────────────────────
   function preview(opt) {
     opt = normalizeOptions(opt);
+    _examCache = null;
     const rows = buildScheduleRows(opt);
     const plan = sheetPlan(opt);
     const sheetNames = [];
@@ -1439,7 +1530,7 @@
       scope: scopeEl ? scopeEl.value : "full",
       rangeStart: (document.getElementById("export-range-start") || {}).value || START,
       rangeEnd: (document.getElementById("export-range-end") || {}).value || END,
-      includeAHF: val("opt-ahf"), includePalana: val("opt-palana"), includeInfo310: val("opt-info310"),
+      includeAHF: val("opt-ahf"), includePalana: val("opt-palana"),
       includeLeetcode: val("opt-leetcode"), includeOptional: val("opt-optional"), includeSkipped: val("opt-skipped"),
       includeAwsCp: val("opt-awscp"), includeJobApps: val("opt-jobapps"),
       includeInterviews: val("opt-interviews"), includeHackathons: val("opt-hackathons"),
@@ -1536,7 +1627,7 @@
         if (typeof playSynthSound === "function") playSynthSound("click");
       });
     });
-    ["opt-ahf", "opt-palana", "opt-info310", "opt-leetcode", "opt-optional", "opt-skipped", "opt-resources", "opt-notes",
+    ["opt-ahf", "opt-palana", "opt-leetcode", "opt-optional", "opt-skipped", "opt-resources", "opt-notes",
      "opt-awscp", "opt-jobapps", "opt-interviews", "opt-hackathons", "opt-portswigger"]
       .forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener("change", refreshPreview); });
     ["export-range-start", "export-range-end"].forEach(id => { const e = document.getElementById(id); if (e) e.addEventListener("change", refreshPreview); });
