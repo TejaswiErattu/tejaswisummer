@@ -5,6 +5,10 @@ calendar, a daily drawer, a progress dashboard, a rollover engine, Excel/CSV
 export, Google-account sync across devices, and an AI assistant that drafts
 schedule changes for you to approve.
 
+**Live demo:** <https://tejaswierattu.github.io/tejaswisummer/?demo=1> opens the
+tracker with made-up sample data (or click **View demo** on the sign-in screen).
+Nothing in the demo is saved or synced.
+
 It is a static site — plain HTML, CSS and JavaScript, no build step — plus
 Firebase (sign-in and storage) and an optional Cloudflare Worker for the
 assistant.
@@ -76,6 +80,24 @@ every device signed into the same account sees the same plan.
    Pages domain) under Authentication → Settings → Authorized domains.
 4. Publish `firestore.rules` (Firestore → Rules).
 
+### Demo mode
+
+"View demo" on the sign-in screen loads an invented plan from `demo-data.js`
+(about eight weeks centred on today) into memory and lifts the gate. While it is
+on:
+
+- nothing is written to `localStorage` and nothing is read from or written to
+  Firestore; any real progress already stored in the browser is left untouched;
+- the assistant and export are switched off, and the sections that are specific
+  to the real plan (settings, tracks, project list, resource links, exam and
+  LeetCode cards) are hidden;
+- "Exit demo" and "Sign in" both reload the page first, so the sample state is
+  never in memory when someone signs in.
+
+`?demo=1` only presses the same button; no data is ever read from the URL. Demo
+is not reachable while signed in. Note that the demo hides the real plan's text
+in the UI, but that text still ships in the page's public source files.
+
 ## The assistant
 
 The panel supports two modes (⚙ in the panel):
@@ -110,12 +132,13 @@ domain in your Firebase project.
 npm test
 ```
 
-runs three suites with plain Node (no dependencies, no browser):
+runs four suites with plain Node (no dependencies, no browser):
 
 | Suite | File | Covers |
 |---|---|---|
 | Assistant | `test-chatbot.mjs` | operation validation, operation-level undo, task context and lookups, API client (retries, truncation, proxy errors), Worker auth/model/limits |
 | Sync | `test-sync.js` | two simulated devices against a fake Firestore: merge, offline edits, rapid saves, migration |
+| Demo | `test-demo.js` | demo mode isolation: no Firestore calls, no storage writes, no assistant requests, exit reloads |
 | Scheduler | `test-scheduler.js` | base plan and extension, capacity, rollover, exams, migrations, reset, Git roadmap |
 
 The scheduler suite currently reports two known failures — days in June–August
@@ -133,6 +156,7 @@ app.js                      state, scheduler, rollover, calendar, drawer, settin
 plan-extension-2026.js      Sep–Dec extension, capacity report and rebalance
 blind75.js, git-roadmap.js  LeetCode list and the summer Git roadmap
 export.js                   Excel / CSV export
+demo-data.js                invented sample plan for demo mode
 firebase-config.js          Firebase web config
 firebase-sync.js            sign-in and Firestore sync
 js/sync-core.js             pure split/merge logic used by sync

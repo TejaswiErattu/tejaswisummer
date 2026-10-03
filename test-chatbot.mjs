@@ -44,8 +44,8 @@ globalThis.document = {
   querySelectorAll: () => []
 };
 
-const adapter = await import("./js/chatbot/adapter.js?v=20260927c");
-const ops = await import("./js/chatbot/operations.js?v=20260927c");
+const adapter = await import("./js/chatbot/adapter.js?v=20261002a");
+const ops = await import("./js/chatbot/operations.js?v=20261002a");
 
 let pass = 0, fail = 0; const failures = [];
 function check(name, cond, detail) {
@@ -278,7 +278,7 @@ console.log("\nValidation: minutes, strings, window, duplicates, risk");
 
 console.log("\nAPI client");
 {
-  const api = await import("./js/chatbot/api.js?v=20260927c");
+  const api = await import("./js/chatbot/api.js?v=20261002a");
   const store = {};
   globalThis.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
   const realFetch = globalThis.fetch, realTimeout = globalThis.setTimeout;

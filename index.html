@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260927b">
-  <link rel="stylesheet" href="css/chatbot.css?v=20260927c">
-  <link rel="stylesheet" href="css/auth-gate.css?v=20260927b">
+  <link rel="stylesheet" href="css/chatbot.css?v=20261002a">
+  <link rel="stylesheet" href="css/auth-gate.css?v=20261002b">
 </head>
 <body class="hacker-theme app-locked">
   <!-- Sign-in gate. Ships visible; js/auth-gate.js is the only thing that lifts it. -->
@@ -38,6 +38,8 @@
           </svg>
           Sign in with Google
         </button>
+        <button type="button" class="gate-demo-btn" data-el="gate-demo">View demo</button>
+        <p class="gate-demo-note">The demo uses made-up sample data. Nothing is saved.</p>
       </div>
 
       <div class="gate-error" data-el="gate-error" hidden></div>
@@ -50,6 +52,12 @@
 
   <!-- Scanline Overlay for CRT effect -->
   <div class="crt-scanlines"></div>
+
+  <!-- Demo banner. Hidden until app.js enters demo mode. -->
+  <div id="demo-banner" class="demo-banner" role="status" hidden>
+    <span class="demo-banner-text"><strong>DEMO:</strong> sample data, nothing is saved</span>
+    <button type="button" id="demo-exit-btn" class="demo-exit-btn">Exit demo</button>
+  </div>
 
   <!-- Firebase Auth Bar -->
   <div id="auth-status-bar" class="auth-bar auth-unsigned">
@@ -76,7 +84,7 @@
   <header class="app-header">
     <div class="header-logo">
       <span class="logo-symbol">&lt;//&gt;</span>
-      <h1 class="logo-text">SEC_OPS // <span class="accent-text-cyan">STUDY_PLAN_2026</span></h1>
+      <h1 class="logo-text" id="logo-text">SEC_OPS // <span class="accent-text-cyan">STUDY_PLAN_2026</span></h1>
       <span class="blinking-cursor">_</span>
     </div>
     
@@ -89,7 +97,7 @@
     <!-- Quick Actions / Header Toggles -->
     <div class="header-actions">
       <!-- Palana Project Quick Toggle -->
-      <div class="toggle-container">
+      <div class="toggle-container" data-demo-hide>
         <span class="toggle-label">Palana Preparation</span>
         <label class="switch">
           <input type="checkbox" id="palana-toggle" checked>
@@ -98,7 +106,7 @@
       </div>
 
       <!-- Settings Icon Button -->
-      <button id="open-settings-btn" class="icon-btn" title="System Configuration">
+      <button id="open-settings-btn" class="icon-btn" title="System Configuration" data-demo-hide>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -108,7 +116,7 @@
   </header>
 
   <!-- Risk Indicator Bar (Flashes if the plan is at risk) -->
-  <div id="at-risk-warning" class="warning-banner hidden">
+  <div id="at-risk-warning" class="warning-banner hidden" data-demo-hide>
     <div class="warning-content">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -144,7 +152,7 @@
           <span class="metric-icon">⏰</span>
         </div>
         <div class="metric-value" id="metric-countdown">--</div>
-        <div class="metric-footer">Target: Dec 31, 2026</div>
+        <div class="metric-footer" id="metric-countdown-target">Target: Dec 31, 2026</div>
       </div>
 
       <!-- Card: Daily Streak -->
@@ -158,7 +166,7 @@
       </div>
 
       <!-- Card: LeetCode Tracker -->
-      <div class="metric-card glow-purple">
+      <div class="metric-card glow-purple" data-demo-hide>
         <div class="metric-header">
           <span class="metric-title">LEETCODE_BLIND_75</span>
           <span class="metric-icon">💻</span>
@@ -171,7 +179,7 @@
       </div>
 
       <!-- Card: Certifications State -->
-      <div class="metric-card glow-orange">
+      <div class="metric-card glow-orange" data-demo-hide>
         <div class="metric-header">
           <span class="metric-title">EXAM_STATUSES</span>
           <span class="metric-icon">🏆</span>
@@ -231,7 +239,7 @@
       <!-- Left Sidebar (Project Picker, Resource Panel, Legend) -->
       <aside class="workspace-sidebar">
         <!-- Project Switcher & Personal Project Tracker -->
-        <div class="panel-card glass-panel" id="project-selector-card">
+        <div class="panel-card glass-panel" id="project-selector-card" data-demo-hide>
           <div class="panel-header">
             <h3>[TRACK_4] cybersecurity_projects <span class="track-range-chip">Aug 22 &ndash; Oct 4</span></h3>
           </div>
@@ -242,7 +250,7 @@
         </div>
 
         <!-- Resource Reference Box -->
-        <div class="panel-card glass-panel">
+        <div class="panel-card glass-panel" data-demo-hide>
           <div class="panel-header">
             <h3>system_learning_links</h3>
           </div>
@@ -309,7 +317,7 @@
         <div class="workspace-tabs-header">
           <div class="tab-selectors">
             <button class="tab-btn active" data-tab="calendar-tab">CALENDAR_VIEW</button>
-            <button class="tab-btn" data-tab="list-tab">TRACKS_CHECKLIST</button>
+            <button class="tab-btn" data-tab="list-tab" data-demo-hide>TRACKS_CHECKLIST</button>
           </div>
           <button id="go-to-today-btn" class="go-to-today-btn" title="Jump to today's date">
             <span class="today-icon">📅</span> GO_TO_TODAY
@@ -332,7 +340,7 @@
         </div>
 
         <!-- Tab 2: Track Checklists View -->
-        <div class="tab-content" id="list-tab">
+        <div class="tab-content" id="list-tab" data-demo-hide>
           <div class="tracks-container">
             <!-- Track 1 checklist card -->
             <div class="track-list-card">
@@ -581,7 +589,7 @@
   </div>
 
   <!-- Settings Configuration Modal -->
-  <div id="settings-modal" class="modal">
+  <div id="settings-modal" class="modal" data-demo-hide>
     <div class="modal-header">
       <h2>SYSTEM_CONFIGURATION_PANEL</h2>
       <button id="close-settings-btn" class="close-btn">
@@ -670,7 +678,7 @@
   </div>
 
   <!-- Export / Reports Configuration Modal -->
-  <div id="export-modal" class="modal modal-wide">
+  <div id="export-modal" class="modal modal-wide" data-demo-hide>
     <div class="modal-header">
       <h2>EXPORT_CONFIG // REPORT_BUILDER</h2>
       <button id="export-close-btn" class="close-btn" title="Close">
@@ -774,12 +782,13 @@
   <script src="git-roadmap.js?v=20260927b"></script>
   <script src="firebase-config.js?v=20260927b"></script>
   <script src="js/sync-core.js?v=20260927b"></script>
-  <script src="app.js?v=20260927c"></script>
+  <script src="demo-data.js?v=20261002a"></script>
+  <script src="app.js?v=20261002b"></script>
   <script src="plan-extension-2026.js?v=20260927c"></script>
-  <script src="export.js?v=20260927b"></script>
-  <script src="firebase-sync.js?v=20260927b"></script>
-  <script src="js/auth-gate.js?v=20260927b"></script>
+  <script src="export.js?v=20261002a"></script>
+  <script src="firebase-sync.js?v=20261002b"></script>
+  <script src="js/auth-gate.js?v=20261002a"></script>
   <!-- Assistant panel. Self-contained ES module; talks to the app only via js/chatbot/adapter.js -->
-  <script type="module" src="js/chatbot/index.js?v=20260927c"></script>
+  <script type="module" src="js/chatbot/index.js?v=20261002a"></script>
 </body>
 </html>

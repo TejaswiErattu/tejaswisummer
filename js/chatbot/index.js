@@ -7,19 +7,19 @@
 // Nothing is ever applied straight from a model response.
 // ============================================================================
 
-import { ChatbotPanel } from "./panel.js?v=20260927c";
-import * as adapter from "./adapter.js?v=20260927c";
-import * as auth from "./auth.js?v=20260927c";
-import * as history from "./history.js?v=20260927c";
+import { ChatbotPanel } from "./panel.js?v=20261002a";
+import * as adapter from "./adapter.js?v=20261002a";
+import * as auth from "./auth.js?v=20261002a";
+import * as history from "./history.js?v=20261002a";
 import {
   callModel, ChatbotApiError, loadSettings, estimateCost, getModel, hasApiKey
-} from "./api.js?v=20260927c";
+} from "./api.js?v=20261002a";
 import {
   buildSystemPrompt, buildContextMessage, JSON_RETRY_MESSAGE, buildValidationRetryMessage
-} from "./prompt.js?v=20260927c";
+} from "./prompt.js?v=20261002a";
 import {
   validateBatch, findRiskyOperations, expandRecurrence, MAX_QUESTIONS, addDays, spreadDates
-} from "./operations.js?v=20260927c";
+} from "./operations.js?v=20261002a";
 
 const MAX_LOOKUP_ROUNDS = 2;
 
@@ -36,9 +36,20 @@ const state = {
   pendingBatch: null         // { operations, summary, risky }
 };
 
+// --- Demo mode --------------------------------------------------------------
+// In the tracker's demo mode (app.js) the assistant is off: no model calls, no
+// key reads, no edits. The panel collapses to a disabled launcher.
+const inDemo = () => typeof window.isDemoMode === "function" && window.isDemoMode();
+function disableForDemo() {
+  if (state.abort) state.abort.abort();
+  state.pendingBatch = null;
+  if (state.panel) state.panel.setDemoDisabled();
+}
+
 // --- Boot -------------------------------------------------------------------
 const BOOT_TIMEOUT_MS = 30000;
 function boot(startedAt = Date.now()) {
+  if (inDemo()) return; // never mount against the sample state
   if (!adapter.isHostReady()) {
     // The host populates its state during its own DOMContentLoaded handler; if
     // we win the race, wait a tick and retry rather than mounting against nothing.
@@ -71,7 +82,10 @@ function boot(startedAt = Date.now()) {
     state.panel.showAuthError(msg);
   });
 
+  window.addEventListener("app:demo-entered", disableForDemo);
+
   auth.onAuthChange((session) => {
+    if (inDemo()) return;
     if (session) {
       state.panel.showAuthError("");
       state.panel.setLocked(false, session);
@@ -104,6 +118,7 @@ function greet() {
 
 // --- Conversation -----------------------------------------------------------
 async function handleSend(text) {
+  if (inDemo()) return;
   const p = state.panel;
 
   const check = auth.requireValidSession();
@@ -132,6 +147,7 @@ async function handleSend(text) {
 }
 
 async function handleChipAnswers(text) {
+  if (inDemo()) return;
   const p = state.panel;
   state.awaitingAnswer = false;
   p.addUser(text);
@@ -407,6 +423,7 @@ function describeChanges(operations, vctx) {
 
 // --- Apply ------------------------------------------------------------------
 function handleApply() {
+  if (inDemo()) return;
   const p = state.panel;
   const batch = state.pendingBatch;
   if (!batch) return;
@@ -465,6 +482,7 @@ function handleApply() {
 // Reverts only what the last batch did. The log entry is removed by the
 // adapter only after the undo succeeds, so a failed undo can be retried.
 function handleUndo() {
+  if (inDemo()) return;
   const p = state.panel;
   const res = adapter.undoLast();
   if (!res.ok) {

@@ -2,7 +2,8 @@
   "name": "cybersecurity-study-plan",
   "private": true,
   "scripts": {
-    "test": "node test-chatbot.mjs && node test-sync.js && node test-scheduler.js",
+    "test": "node test-chatbot.mjs && node test-sync.js && node test-demo.js && node test-scheduler.js",
+    "test:demo": "node test-demo.js",
     "test:sync": "node test-sync.js",
     "test:chatbot": "node test-chatbot.mjs"
   }

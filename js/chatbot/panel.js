@@ -5,7 +5,7 @@
 // host-app DOM; all host interaction goes through adapter.js.
 // ============================================================================
 
-import { MODELS, loadSettings, saveSettings, getApiKey, setApiKey, hasApiKey, getModel, validateProxyUrl } from "./api.js?v=20260927c";
+import { MODELS, loadSettings, saveSettings, getApiKey, setApiKey, hasApiKey, getModel, validateProxyUrl } from "./api.js?v=20261002a";
 
 const UI_KEY = "chatbot_ui_state_v1";
 const NARROW_BREAKPOINT = 1100;
@@ -216,11 +216,25 @@ export class ChatbotPanel {
   }
 
   setOpen(open, silent) {
+    if (this.demo && open) return;
     this.root.classList.toggle("cb-open", !!open);
     this.fab.classList.toggle("cb-fab-hidden", !!open);
     document.body.classList.toggle("cb-panel-open", !!open);
     if (!silent) this.ui = saveUi({ open: !!open });
     if (open && !this.locked) setTimeout(() => this.el.input?.focus(), 60);
+  }
+
+  // Demo mode: the assistant is off. Collapse without persisting the UI state
+  // and leave a disabled launcher that says why.
+  setDemoDisabled() {
+    this.demo = true;
+    this.locked = true;
+    this.setOpen(false, true);
+    this.fab.disabled = true;
+    this.fab.classList.add("cb-fab-demo");
+    this.fab.textContent = "💬 Assistant: not available in demo";
+    this.fab.title = "Not available in demo";
+    this.fab.setAttribute("aria-label", "Assistant: not available in demo");
   }
 
   // --- auth gating ----------------------------------------------------------

@@ -18,7 +18,7 @@
 //   The schema this module speaks uses estimatedMinutes; we convert at the edge.
 // ============================================================================
 
-import { expandRecurrence, isValidDateStr, addDays, projectIdFor, spreadDates } from "./operations.js?v=20260927c";
+import { expandRecurrence, isValidDateStr, addDays, projectIdFor, spreadDates } from "./operations.js?v=20261002a";
 
 const CONTEXT_LOOKAHEAD_DAYS = 21;
 const TASK_WINDOW_DAYS = 14;     // tasks today..+14 ship with every request

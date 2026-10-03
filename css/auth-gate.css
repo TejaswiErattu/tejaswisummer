@@ -100,6 +100,35 @@ body.app-locked { overflow: hidden; }
   box-shadow: 0 6px 20px rgba(255, 255, 255, 0.18);
 }
 
+/* Secondary action under the Google button. */
+.gate-demo-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 9px 20px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan);
+  background: transparent;
+  border: 1px solid var(--neon-cyan);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gate-demo-btn:hover,
+.gate-demo-btn:focus-visible {
+  background: rgba(139, 233, 253, 0.1);
+  box-shadow: 0 0 14px rgba(139, 233, 253, 0.25);
+}
+
+.gate-demo-note {
+  margin: 8px 0 0;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 .gate-error {
   margin-top: 16px;
   padding: 10px 12px;
@@ -126,3 +155,44 @@ body.app-locked { overflow: hidden; }
   .gate-card { padding: 26px 20px; }
   .gate-sub { font-size: 0.78rem; }
 }
+
+/* --- demo mode ------------------------------------------------------------
+   body.demo-mode is set by applyDemoChrome() in app.js. Anything marked
+   data-demo-hide in index.html is personal to the real plan and stays hidden. */
+body.demo-mode [data-demo-hide] { display: none !important; }
+/* The banner owns the sticky top edge in demo; the header scrolls with the page. */
+body.demo-mode .app-header { position: static; }
+
+.demo-banner {
+  position: sticky;
+  top: 0;
+  z-index: 1005; /* above the modal backdrop, below the drawer and modals */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 7px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: #1c1326;
+  background: #ffe680;
+  border-bottom: 1px solid #c9a400;
+}
+
+.demo-banner[hidden] { display: none !important; }
+
+.demo-exit-btn {
+  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: #ffe680;
+  background: #1c1326;
+  border: 1px solid #1c1326;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.demo-exit-btn:hover,
+.demo-exit-btn:focus-visible { background: #3a2850; }

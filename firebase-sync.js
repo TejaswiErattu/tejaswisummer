@@ -7,8 +7,15 @@ const db = firebase.firestore();
 
 let currentUser = null;
 
+// Demo mode (app.js) holds invented state in memory. Nothing in this file may
+// run while it is set: no sign-in, no Firestore read, no Firestore write.
+function inDemoMode() { return typeof isDemoMode === "function" && isDemoMode(); }
+
 // ── SIGN IN / OUT ─────────────────────────────────────────────
 function signInWithGoogle() {
+  // The load path merges in-memory state into the cloud on sign-in, so the
+  // sample state has to be gone first. Reload; sign-in happens from the gate.
+  if (inDemoMode()) { location.reload(); return; }
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider).catch(err => {
     console.error("Sign-in error:", err.code, err.message);
@@ -24,6 +31,7 @@ function signInWithGoogle() {
 }
 
 async function signOutFirebase() {
+  if (inDemoMode()) return;
   // Push any debounced change up before the session ends. js/auth-gate.js wipes
   // local progress right after sign-out, so anything not flushed here is lost.
   try {
@@ -47,6 +55,12 @@ async function signOutFirebase() {
 
 // ── AUTH STATE LISTENER ───────────────────────────────────────
 auth.onAuthStateChanged(async (user) => {
+  // A user appearing mid-demo (e.g. signed in from another tab): drop the
+  // sample state by reloading before anything can load, merge or save.
+  if (inDemoMode()) {
+    if (user) location.reload();
+    return;
+  }
   currentUser = user;
   updateAuthUI(user);
 
@@ -109,6 +123,7 @@ function userRef() { return db.collection("users").doc(currentUser.uid); }
 
 // Reads the full cloud copy. Returns { state, pieces, legacy } or null.
 async function readCloud(rootSnap) {
+  if (inDemoMode()) return null;
   const snap = rootSnap || await userRef().get({ source: "server" });
   if (!snap.exists) return null;
   const data = snap.data();
@@ -136,6 +151,7 @@ async function readCloud(rootSnap) {
 
 // Applies the merge rule between appState and a cloud copy. Returns the choice.
 function reconcileWithCloud(cloud) {
+  if (inDemoMode()) return "local";
   const choice = SyncCore.decide(appState, cloud && cloud.state, getLastSyncedAt(), cloud && cloud.legacy);
   if (cloud) {
     cloudCache = { meta: cloud.pieces.meta, root: cloud.pieces.root, months: cloud.pieces.months, notes: cloud.pieces.notes, legacy: cloud.legacy };
@@ -159,28 +175,34 @@ function reconcileWithCloud(cloud) {
 // and the running save loops once more when it finishes. The returned promise
 // settles after every queued pass is done (signOutFirebase relies on this).
 function saveStateToFirestore() {
+  if (inDemoMode()) return Promise.resolve();
   if (!currentUser) return Promise.resolve();
   if (saveInFlight) { saveAgain = true; return saveInFlight; }
   saveInFlight = (async () => {
     do {
       saveAgain = false;
       await writeOnce();
-    } while (saveAgain && currentUser);
+    } while (saveAgain && currentUser && !inDemoMode());
   })().finally(() => { saveInFlight = null; });
   return saveInFlight;
 }
 
 async function writeOnce() {
+  if (inDemoMode()) return;
   setSyncStatus("saving");
   try {
     // A server read first: it fails fast when offline (instead of a write that
     // hangs until reconnect) and tells us whether another device saved since
     // our last sync, in which case we merge before overwriting anything.
     const rootSnap = await userRef().get({ source: "server" });
+    // Demo may have started while that read was in flight (session expired,
+    // then "View demo"): appState is sample data now, so stop here.
+    if (inDemoMode()) return;
     const cloudTs = rootSnap.exists && rootSnap.data().meta ? rootSnap.data().meta.updatedAt || 0 : 0;
     const cachedTs = cloudCache.meta ? cloudCache.meta.updatedAt || 0 : 0;
     if (rootSnap.exists && (cloudTs !== cachedTs || rootSnap.data().state)) {
       const cloud = await readCloud(rootSnap);
+      if (inDemoMode()) return;
       const choice = reconcileWithCloud(cloud);
       if (choice !== "local" && stateReady) {
         if (typeof runStatePipeline === "function") runStatePipeline();
@@ -240,10 +262,12 @@ async function writeOnce() {
 
 // ── LOAD FROM FIRESTORE ───────────────────────────────────────
 async function loadStateFromFirestore() {
+  if (inDemoMode()) return;
   if (!currentUser) return;
   cloudCache = { meta: null, root: null, months: {}, notes: null, legacy: false };
   try {
     const cloud = await readCloud();
+    if (inDemoMode()) return;
     const localTasks = (appState?.days || []).reduce((n, d) => n + (d.tasks?.length || 0), 0);
     if (!cloud && localTasks === 0) generateNewState();
     reconcileWithCloud(cloud);
@@ -258,9 +282,11 @@ async function loadStateFromFirestore() {
 // Pick up another device's changes when this tab comes back into view or the
 // connection returns. A local unsynced edit is merged, never overwritten.
 async function pullIfRemoteChanged() {
+  if (inDemoMode()) return;
   if (!currentUser || !stateReady || saveInFlight) return;
   try {
     const rootSnap = await userRef().get({ source: "server" });
+    if (inDemoMode()) return;
     const data = rootSnap.exists ? rootSnap.data() : null;
     const cloudTs = data && data.meta ? data.meta.updatedAt || 0 : 0;
     const cachedTs = cloudCache.meta ? cloudCache.meta.updatedAt || 0 : 0;
@@ -299,6 +325,7 @@ function updateAuthUI(user) {
   const signOutBtn = document.getElementById("auth-signout-btn");
   const userInfo = document.getElementById("auth-user-info");
   const avatar = document.getElementById("auth-avatar");
+  if (inDemoMode()) return; // applyDemoChrome() owns the bar in demo
 
   if (user) {
     bar.classList.remove("auth-unsigned");
