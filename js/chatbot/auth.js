@@ -12,8 +12,8 @@
 // audience, expiry, allowlist), and that IS a real boundary.
 // ============================================================================
 
-import { ALLOWED_EMAILS } from "./auth-config.js?v=20260927c";
-import { registerIdTokenGetter } from "./api.js?v=20260927c";
+import { ALLOWED_EMAILS } from "./auth-config.js?v=20261002a";
+import { registerIdTokenGetter } from "./api.js?v=20261002a";
 
 let session = null;              // { email, name, picture }
 const listeners = new Set();

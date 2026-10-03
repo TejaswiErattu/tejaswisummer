@@ -450,6 +450,21 @@
 }
 .cb-fab:hover { transform: scale(1.08); }
 .cb-fab-hidden { opacity: 0; pointer-events: none; transform: scale(0.8); }
+/* Demo mode: a disabled launcher that says why (panel.setDemoDisabled). */
+.cb-fab-demo,
+.cb-fab-demo:hover {
+  width: auto;
+  height: auto;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.85;
+}
 
 /* --- toast ---------------------------------------------------------------- */
 .cb-toast {

@@ -5,7 +5,7 @@
 // go stale and contains no hardcoded knowledge of this particular tracker.
 // ============================================================================
 
-import { OPERATION_NAMES, MAX_INSTANCES_PER_BATCH, MAX_QUESTIONS } from "./operations.js?v=20260927c";
+import { OPERATION_NAMES, MAX_INSTANCES_PER_BATCH, MAX_QUESTIONS } from "./operations.js?v=20261002a";
 
 export function buildSystemPrompt(ctx) {
   const categoryLines = ctx.categories

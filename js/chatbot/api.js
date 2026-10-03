@@ -25,6 +25,12 @@ export function getModel(id) {
   return MODELS.find(m => m.id === id) || MODELS[0];
 }
 
+// Demo mode (app.js) switches the assistant off. Checked before settings or the
+// key are read, so a demo visitor causes no key read and no request.
+function inDemo() {
+  return typeof window !== "undefined" && typeof window.isDemoMode === "function" && window.isDemoMode();
+}
+
 // --- Settings ---------------------------------------------------------------
 const DEFAULT_SETTINGS = {
   mode: "direct",        // "direct" (Mode A) | "proxy" (Mode B)
@@ -62,6 +68,7 @@ export function saveSettings(patch) {
 // The key lives on its own so it is never accidentally serialised alongside
 // anything we might export, log, or sync.
 export function getApiKey() {
+  if (inDemo()) return "";
   try { return localStorage.getItem(API_KEY_STORAGE_KEY) || ""; } catch { return ""; }
 }
 
@@ -97,6 +104,7 @@ const MAX_RETRY_AFTER_SECONDS = 30;
 // messages: [{ role: "user"|"assistant", content: string }]
 // Returns { text, usage: { input_tokens, output_tokens }, model }
 export async function callModel({ system, messages, signal, onRetry }) {
+  if (inDemo()) throw new ChatbotApiError("demo", "The assistant is not available in demo.");
   const settings = loadSettings();
   const usingProxy = settings.mode === "proxy" && !!settings.proxyUrl;
 

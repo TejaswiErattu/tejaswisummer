@@ -413,6 +413,13 @@ const PLAN_TIMEZONE = "America/Los_Angeles";
 // through runStatePipeline(); saving before then could persist the wrong user's data.
 let stateReady = false;
 
+// "View demo" mode. One in-memory flag, set only by enterDemoMode() (the gate's
+// "View demo" button). It is never read from the URL, storage or a message, and
+// it clears only by reloading the page. While it is true nothing is saved,
+// synced, exported or sent anywhere. See "13. DEMO MODE" below.
+let demoMode = false;
+function isDemoMode() { return demoMode; }
+
 // Settings for a brand-new or reset plan. origin: "fresh" marks a state that
 // has no personal history, so the one-time "mark past days complete" passes
 // (August, June/July, Sept 1-2, Sept 3-15) never run on it. The owner's
@@ -656,6 +663,7 @@ function getRealCurrentDateObj() {
 // Plan "today" — real LA date clamped to plan window (never hardcoded June 13)
 function planToday() {
   const real = getRealCurrentDate();
+  if (demoMode) return real; // demo days are built around the real date
   if (real < START_DATE_STR) return START_DATE_STR;
   if (real > END_DATE_STR) return END_DATE_STR;
   return real;
@@ -664,6 +672,14 @@ function planToday() {
 // Merge built-in + user custom categories
 function getAllCategories() {
   const merged = {};
+  if (demoMode) {
+    // Demo shows only the sample categories (plus the generic fallback).
+    merged.custom = Object.assign({ id: "custom", builtIn: true, active: true, archived: false, exportEnabled: true, order: 99 }, BUILT_IN_CATEGORIES.custom);
+    Object.entries(appState.categories || {}).forEach(([id, cat]) => {
+      merged[id] = Object.assign({ id, builtIn: false }, cat);
+    });
+    return merged;
+  }
   Object.entries(BUILT_IN_CATEGORIES).forEach(([id, cat]) => {
     merged[id] = Object.assign({ id, builtIn: true, active: true, archived: false, exportEnabled: true, order: cat.priority || 99 }, cat);
   });
@@ -1621,6 +1637,7 @@ window.repairReflowDamage = repairReflowDamage;
 // Reflows scheduled hours if Palana Project toggle or settings are modified.
 // Does NOT lock any days, just reflows the future curriculum.
 function reflowRemainingCurriculum() {
+  if (demoMode) return; // would schedule the real curriculum into the sample days
   inferTaskSources();
   const inBase = (day) => day.date <= BASE_SCHEDULE_END;
   const isBase = (t) => t.source === "base";
@@ -2481,6 +2498,8 @@ function saveState() {
   // While the sign-in gate is up we don't know whose progress this is yet, so
   // nothing gets written to disk. Boot-time migrations that run before auth
   // resolves simply re-run on the next load, which is harmless.
+  // Demo edits live in memory only: no localStorage write, no Firestore timer.
+  if (demoMode) return;
   if (!stateReady) return;
   if (typeof SyncCore !== "undefined") {
     const now = Date.now();
@@ -2505,6 +2524,7 @@ function saveState() {
 }
 
 function loadState() {
+  if (demoMode) return;
   const saved = localStorage.getItem("cyber_study_plan_state_2026");
   if (saved) {
     try {
@@ -2644,6 +2664,7 @@ function migrateRolloverAndExamsV1() {
 // step is idempotent, so running it on an already-migrated state is a no-op.
 let _builtInCategoryDefaults = null;
 function runStatePipeline() {
+  if (demoMode) return; // migrations and plan extension belong to the real plan
   // Snapshot built-in categories before any saved overrides touch them, so a
   // reset can restore them.
   if (!_builtInCategoryDefaults) _builtInCategoryDefaults = JSON.parse(JSON.stringify(BUILT_IN_CATEGORIES));
@@ -2668,6 +2689,7 @@ function runStatePipeline() {
 }
 
 function generateNewState() {
+  if (demoMode) return;
   appState.settings = Object.assign(defaultSettings(), { lastRolloverDay: null });
   generateBaseSchedule();
   saveState();
@@ -2724,6 +2746,7 @@ function migrateScheduleIfNeeded() {
 // instead of being merged away. Then the plan is rebuilt through the same
 // pipeline every load uses.
 function resetPlannerState() {
+  if (demoMode) return;
   const keep = { meta: appState.meta, deletedTaskIds: appState.deletedTaskIds };
   Object.keys(appState).forEach(k => { delete appState[k]; });
   Object.assign(appState, {
@@ -2872,6 +2895,7 @@ function initUI() {
 
 // ⭐ NEW: Initialize extracurriculars with seed data on first load
 function initializeExtracurriculars() {
+  if (demoMode) return;
   if (!appState.extracurriculars || appState.extracurriculars.length === 0) {
     appState.extracurriculars = [...BUILT_IN_EXTRACURRICULARS];
     saveState();
@@ -2963,7 +2987,8 @@ function renderDashboardMetrics() {
   // Countdown to Sept 1, 2026
   // ⭐ NEW: Use real browser date (America/Los_Angeles timezone), not simulated
   let realToday = getRealCurrentDateObj();
-  const endPlanDate = parseDate(END_DATE_STR);
+  const demoEnd = demoMode && appState.days.length ? appState.days[appState.days.length - 1].date : null;
+  const endPlanDate = parseDate(demoEnd || END_DATE_STR);
   const diffTime = endPlanDate - realToday;
   const daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   document.getElementById("metric-countdown").innerText = `${daysLeft} days`;
@@ -3059,6 +3084,7 @@ function renderDashboardMetrics() {
 function renderProjectSelector() {
   const container = document.getElementById("project-options-list");
   container.innerHTML = "";
+  if (demoMode) return; // the project list is the real plan's; its card is hidden in demo
 
   const datedProjects = TRACK_4_PROJECTS.filter(p => p.dated);
   const legacyProjects = TRACK_4_PROJECTS.filter(p => !p.dated);
@@ -3147,7 +3173,7 @@ function renderCalendarMonthControls() {
   const container = document.getElementById("month-tabs");
   container.innerHTML = "";
   
-  const months = [
+  const months = demoMode ? demoMonths() : [
     { code: "2026-06", label: "JUNE 2026" },
     { code: "2026-07", label: "JULY 2026" },
     { code: "2026-08", label: "AUGUST 2026" },
@@ -3195,7 +3221,7 @@ function renderCalendarDays() {
   // Look these up once per render, not once per cell.
   const realTodayDate = getRealCurrentDate();
   const planTodayDate = planToday();
-  const getHeavyReason = (typeof heavyDayReason === "function") ? heavyDayReason : () => null;
+  const getHeavyReason = (!demoMode && typeof heavyDayReason === "function") ? heavyDayReason : () => null;
 
   monthDays.forEach(day => {
     const dayCell = document.createElement("div");
@@ -3311,7 +3337,7 @@ function showDayDetails(dateStr) {
   });
   document.getElementById("drawer-date-title").innerText = formattedTitle;
   
-  const daysDiff = getDaysBetween(START_DATE_STR, dateStr) + 1;
+  const daysDiff = getDaysBetween(demoMode ? appState.days[0].date : START_DATE_STR, dateStr) + 1;
   document.getElementById("drawer-date-code").innerText = `SYS_DAY_${String(daysDiff).padStart(2, '0')}`;
   
   // Capacity and schedule hours
@@ -3334,7 +3360,7 @@ function showDayDetails(dateStr) {
 
   // India Trip warning banner / heavy-day collision flag
   const noteEl = document.getElementById("drawer-day-note");
-  const heavyReason = (typeof heavyDayReason === "function") ? heavyDayReason(dateStr) : null;
+  const heavyReason = (!demoMode && typeof heavyDayReason === "function") ? heavyDayReason(dateStr) : null;
   if (day.isIndia) {
     noteEl.innerText = "INDIA TRIP: Workload capped to 2-3 hours max. Light tasks only.";
     noteEl.className = "drawer-day-note";
@@ -3599,6 +3625,7 @@ function closeDrawer() {
 
 // Tab 2: Render Syllabus Progression Lists
 function renderTracksChecklists() {
+  if (demoMode) return; // the four tracks are the real plan's; the tab is hidden in demo
   const tracks = ["portswigger", "aws", "secplus", "projects"];
   
   tracks.forEach(track => {
@@ -3681,16 +3708,17 @@ function cycleQuotes() {
   const quoteEl = document.getElementById("motivational-quote");
   
   // Set initial quote
-  const index = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
-  quoteEl.innerText = MOTIVATIONAL_QUOTES[index];
+  const quotes = (demoMode && typeof DEMO_COPY !== "undefined" && DEMO_COPY.quotes.length) ? DEMO_COPY.quotes : MOTIVATIONAL_QUOTES;
+  const index = Math.floor(Math.random() * quotes.length);
+  quoteEl.innerText = quotes[index];
   
   if (quoteInterval) clearInterval(quoteInterval);
   quoteInterval = setInterval(() => {
     // Typewriter emulation
     quoteEl.style.opacity = 0;
     setTimeout(() => {
-      const idx = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
-      quoteEl.innerText = MOTIVATIONAL_QUOTES[idx];
+      const idx = Math.floor(Math.random() * quotes.length);
+      quoteEl.innerText = quotes[idx];
       quoteEl.style.opacity = 1;
     }, 400);
   }, 12000);
@@ -3733,6 +3761,128 @@ window.deleteCategory = deleteCategory;
 window.showDayDetails = showDayDetails;
 window.runStatePipeline = runStatePipeline;
 window.addNewExtracurricular = addNewExtracurricular;
+
+// 13. DEMO MODE
+// Lets a signed-out visitor explore the UI with the invented plan from
+// demo-data.js. Isolation rules:
+//   - entered only by enterDemoMode(), and only while nobody is signed in;
+//   - appState is replaced in memory; localStorage is neither read nor written,
+//     so real local progress on this browser is left exactly as it was;
+//   - saveState(), the load/migration pipeline and every Firestore path return
+//     early while demoMode is set (see firebase-sync.js);
+//   - the only way out is a full reload. firebase-sync.js merges in-memory
+//     state into the cloud on sign-in, so the sample state must be gone from
+//     memory before anyone authenticates.
+function demoMonths() {
+  const seen = [];
+  appState.days.forEach(d => {
+    const code = d.date.substring(0, 7);
+    if (!seen.includes(code)) seen.push(code);
+  });
+  return seen.map(code => ({
+    code,
+    label: parseDate(`${code}-01`).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase()
+  }));
+}
+
+function enterDemoMode() {
+  if (demoMode) return true;
+  // A signed-in session owns appState; the demo must never replace it.
+  if (typeof currentUser !== "undefined" && currentUser) return false;
+  try {
+    if (typeof firebase !== "undefined" && firebase.auth && firebase.auth().currentUser) return false;
+  } catch (e) { return false; }
+  if (typeof buildDemoState !== "function") return false;
+
+  const today = getRealCurrentDate();
+  const demoState = buildDemoState(today);
+  demoMode = true;
+  clearTimeout(_saveTimer);
+  _taskFingerprints = null;
+  _lastLocalPieces = null;
+  appState = demoState;
+  activeMonth = today.substring(0, 7);
+  selectedDate = null;
+
+  applyDemoChrome();
+  applyCategoryColors();
+  initUI();
+  window.dispatchEvent(new Event("app:demo-entered"));
+  return true;
+}
+
+function exitDemoMode() {
+  location.reload();
+}
+
+// Swaps or hides the page's hardcoded personal content. Elements marked
+// data-demo-hide in index.html are hidden by body.demo-mode (css/auth-gate.css).
+function applyDemoChrome() {
+  const copy = (typeof DEMO_COPY !== "undefined" && DEMO_COPY) || {};
+  const byId = (id) => document.getElementById(id);
+  document.body.classList.add("demo-mode");
+
+  const banner = byId("demo-banner");
+  if (banner) banner.hidden = false;
+
+  // Auth bar: a named visitor, no avatar, no sync indicator.
+  const userInfo = byId("auth-user-info");
+  if (userInfo) { userInfo.innerText = copy.visitorName || "Demo visitor"; userInfo.classList.remove("hidden"); }
+  const avatar = byId("auth-avatar");
+  if (avatar) { avatar.removeAttribute("src"); avatar.classList.add("hidden"); }
+  const ind = byId("sync-indicator");
+  if (ind) ind.classList.add("hidden");
+  const signOutBtn = byId("auth-signout-btn");
+  if (signOutBtn) signOutBtn.classList.add("hidden");
+
+  const logo = byId("logo-text");
+  if (logo) logo.innerHTML = `${escapeHtml(copy.logoLead)} <span class="accent-text-cyan">${escapeHtml(copy.logoAccent)}</span>`;
+
+  const lastDay = appState.days.length ? appState.days[appState.days.length - 1].date : null;
+  const target = byId("metric-countdown-target");
+  if (target && lastDay) {
+    target.innerText = `Target: ${parseDate(lastDay).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  }
+
+  // Export is off in demo (export.js also refuses).
+  ["dash-export-excel", "dash-export-csv", "dash-export-options"].forEach(id => {
+    const btn = byId(id);
+    if (btn) { btn.disabled = true; btn.title = copy.exportUnavailable || ""; }
+  });
+  const exportLabel = byId("last-export-label");
+  if (exportLabel) exportLabel.textContent = copy.exportUnavailable || "";
+
+  // Legend and category colours come from the sample categories.
+  const cats = Object.values(getAllCategories()).filter(c => c.id !== "custom" && /^[a-z0-9_]+$/.test(c.id) && /^#[0-9a-fA-F]{6}$/.test(c.color));
+  const legend = document.querySelector(".legend-grid");
+  if (legend) {
+    legend.innerHTML = cats.map(c =>
+      `<div class="legend-item"><span class="legend-dot" style="background:${escapeHtml(c.color)}; box-shadow:0 0 6px ${escapeHtml(c.color)}"></span> ${escapeHtml(c.name)}</div>`
+    ).join("");
+  }
+  const style = document.createElement("style");
+  style.id = "demo-category-style";
+  style.textContent = cats.map(c =>
+    `.day-task-block.cat-${c.id}{background:${c.color};border-color:transparent}` +
+    `.today-task-row.cat-${c.id}{border-left-color:${c.color}}` +
+    `.task-cat-badge.badge-${c.id}{color:${c.color};border:1px solid ${c.color};background:color-mix(in srgb, ${c.color} 12%, transparent)}`
+  ).join("\n");
+  (document.head || document.body).appendChild(style);
+
+  // Extracurricular form: sample categories and neutral placeholders.
+  const ecCat = byId("ec-category");
+  if (ecCat) {
+    ecCat.innerHTML = Object.values(getAllCategories())
+      .map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join("");
+  }
+  [["ec-name", copy.ecNamePlaceholder], ["ec-role", copy.ecRolePlaceholder], ["ec-nextEvent", copy.ecNextEventPlaceholder]].forEach(([id, text]) => {
+    const el = byId(id);
+    if (el && text) el.placeholder = text;
+  });
+}
+window.isDemoMode = isDemoMode;
+window.enterDemoMode = enterDemoMode;
+window.exitDemoMode = exitDemoMode;
 
 // 12. EVENT LISTENERS & SETUP
 function bootApp() {
@@ -3852,6 +4002,9 @@ function bootApp() {
       closeSettings();
     }
   });
+
+  const demoExitBtn = document.getElementById("demo-exit-btn");
+  if (demoExitBtn) demoExitBtn.addEventListener("click", exitDemoMode);
 
   // 7. Firebase auth buttons
   document.getElementById("auth-signin-btn").addEventListener("click", () => {

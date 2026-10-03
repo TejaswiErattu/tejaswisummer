@@ -1418,7 +1418,12 @@
   }
 
   // ── Public: Excel export ───────────────────────────────────────────────────
+  // Demo mode (app.js): export is off, so no file of sample data can be
+  // mistaken for a real report and no export bookkeeping is written.
+  function inDemo() { return typeof window.isDemoMode === "function" && window.isDemoMode(); }
+
   async function exportExcel(opt) {
+    if (inDemo()) return null;
     opt = normalizeOptions(opt);
     await ensureLibs();
     const data = gather(opt);
@@ -1433,6 +1438,7 @@
 
   // ── Public: CSV export (Full Schedule only) ────────────────────────────────
   async function exportCsv(opt) {
+    if (inDemo()) return null;
     opt = normalizeOptions(opt);
     const data = gather(opt);
     const cols = [
@@ -1549,6 +1555,7 @@
   }
 
   function openModal() {
+    if (inDemo()) return;
     const m = document.getElementById("export-modal");
     const bd = document.getElementById("overlay-backdrop");
     if (!m) return;
