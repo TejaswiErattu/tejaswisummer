@@ -413,6 +413,13 @@ const PLAN_TIMEZONE = "America/Los_Angeles";
 // through runStatePipeline(); saving before then could persist the wrong user's data.
 let stateReady = false;
 
+// True while appState is a plan generated on this page load because there was
+// no local save (first visit, or right after sign-out wiped local progress).
+// It holds no real progress, so it must never stand in for the cloud copy:
+// firebase-sync.js keeps the app locked and retries the cloud load instead of
+// running on it. Cleared once a cloud load succeeds.
+let localStateIsPlaceholder = false;
+
 // "View demo" mode. One in-memory flag, set only by enterDemoMode() (the gate's
 // "View demo" button). It is never read from the URL, storage or a message, and
 // it clears only by reloading the page. While it is true nothing is saved,
@@ -2526,12 +2533,14 @@ function saveState() {
 function loadState() {
   if (demoMode) return;
   const saved = localStorage.getItem("cyber_study_plan_state_2026");
+  localStateIsPlaceholder = false;
   if (saved) {
     try {
       appState = JSON.parse(saved);
       // Validate load
       if (!appState.days || appState.days.length === 0) {
         generateNewState();
+        localStateIsPlaceholder = true;
       }
       // ⭐ NEW: Migrate from simulated today to real today
       migrateToRealCurrentDate();
@@ -2539,9 +2548,11 @@ function loadState() {
     } catch (e) {
       console.error("Failed to parse state, generating new.", e);
       generateNewState();
+      localStateIsPlaceholder = true;
     }
   } else {
     generateNewState();
+    localStateIsPlaceholder = true;
   }
 }
 

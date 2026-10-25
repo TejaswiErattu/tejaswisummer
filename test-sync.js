@@ -286,6 +286,26 @@ function check(name, cond, detail) {
   A.run(`appState.archivedTasks = Array.from({ length: 250 }, (_, i) => ({ id: 'arch' + i })); saveState();`);
   check('Capped to the most recent 200', A.run('appState.archivedTasks.length') === 200 && A.run('appState.archivedTasks[0].id') === 'arch50');
 
+  console.log('\nScenario 10: cloud unreachable right after sign-out does not wipe ticks');
+  await A.flush();
+  const doneBefore = cloudState(cloud).days.flatMap(d => d.tasks).filter(t => t.completed).length;
+  // Sign-out purges local progress (js/auth-gate.js), then the page reloads.
+  ['cyber_study_plan_state_2026', 'cyber_sync_state_v1'].forEach(k => delete A.store[k]);
+  const commitsBefore10 = cloud.commits.length;
+  const R = makeDevice('R', cloud, A.store);
+  R.offline = true;
+  await R.authCb({ uid: 'u1', displayName: 'Test User', email: 'test@example.com' });
+  check('Stays locked on the placeholder plan', R.run('stateReady') === false);
+  await R.run('saveStateToFirestore()');
+  check('Nothing written while the cloud is unreachable', cloud.commits.length === commitsBefore10);
+  R.offline = false;
+  await sleep(2300); // first retry fires after 2 s
+  await R.flush();
+  const doneAfter = cloudState(cloud).days.flatMap(d => d.tasks).filter(t => t.completed).length;
+  check('Retry loads the cloud copy', R.run('stateReady') === true && R.task(Y) && R.task(X).completed === true);
+  check('Cloud keeps every tick', doneAfter >= doneBefore, `${doneBefore} before, ${doneAfter} after`);
+  check('Cloud root is not replaced by the placeholder', cloudState(cloud).settings.origin === A.run('appState.settings.origin'));
+
   const sizes = A.run('(function(){ const p = SyncCore.split(appState); return { root: p.root.length, notes: p.notes.length, maxMonth: Math.max(...Object.values(p.months).map(m => m.length)), total: JSON.stringify(appState).length }; })()');
   console.log(`\nSizes (chars): ${JSON.stringify(sizes)}`);
   console.log(`\n${pass} passed, ${fail} failed.`);

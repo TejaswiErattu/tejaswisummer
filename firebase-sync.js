@@ -63,20 +63,49 @@ auth.onAuthStateChanged(async (user) => {
   }
   currentUser = user;
   updateAuthUI(user);
+  clearTimeout(loadRetryTimer);
+  loadRetryDelay = LOAD_RETRY_MIN_MS;
 
   if (user) {
     // User just signed in — load their cloud state
     showAuthToast("Loading your cloud save...", "info");
-    await loadStateFromFirestore();
-    stateReady = true;
-    runStatePipeline();
-    saveState();
-    initUI();
-    window.__appStateLoaded = true;
-    window.dispatchEvent(new Event("app:state-loaded"));
-    showAuthToast(`Synced ☁️ Welcome back, ${user.displayName?.split(' ')[0] || 'hacker'}!`, "success");
+    await startSession(user);
   }
 });
+
+// ── SESSION START ─────────────────────────────────────────────
+// Loads the cloud copy and only then marks state ready. If the cloud can't be
+// read while appState is only a placeholder (nothing saved on this device —
+// e.g. just after sign-out wiped local progress), the app stays locked and
+// retries. Running on the placeholder instead would save it, and the next
+// sync would merge it over the real cloud copy: its freshly generated tasks
+// look newer than the user's ticks, which then come back unchecked.
+const LOAD_RETRY_MIN_MS = 2000;
+const LOAD_RETRY_MAX_MS = 30000;
+let loadRetryTimer = null;
+let loadRetryDelay = LOAD_RETRY_MIN_MS;
+
+async function startSession(user) {
+  if (inDemoMode() || currentUser !== user || stateReady) return;
+  const loaded = await loadStateFromFirestore();
+  if (inDemoMode() || currentUser !== user || stateReady) return;
+  if (!loaded) {
+    if (window.authGate) window.authGate.showLoadError("Couldn't reach your cloud save. Retrying…");
+    clearTimeout(loadRetryTimer);
+    loadRetryTimer = setTimeout(() => startSession(user), loadRetryDelay);
+    loadRetryDelay = Math.min(loadRetryDelay * 2, LOAD_RETRY_MAX_MS);
+    return;
+  }
+  clearTimeout(loadRetryTimer);
+  loadRetryDelay = LOAD_RETRY_MIN_MS;
+  stateReady = true;
+  runStatePipeline();
+  saveState();
+  initUI();
+  window.__appStateLoaded = true;
+  window.dispatchEvent(new Event("app:state-loaded"));
+  showAuthToast(`Synced ☁️ Welcome back, ${user.displayName?.split(' ')[0] || 'hacker'}!`, "success");
+}
 
 // ── SYNC BOOKKEEPING ──────────────────────────────────────────
 // Merge rule and cloud layout: see js/sync-core.js.
@@ -177,6 +206,9 @@ function reconcileWithCloud(cloud) {
 function saveStateToFirestore() {
   if (inDemoMode()) return Promise.resolve();
   if (!currentUser) return Promise.resolve();
+  // Before the cloud copy has loaded, appState may be a placeholder; writing it
+  // (e.g. the pre-sign-out flush) would overwrite the real cloud copy.
+  if (!stateReady) return Promise.resolve();
   if (saveInFlight) { saveAgain = true; return saveInFlight; }
   saveInFlight = (async () => {
     do {
@@ -261,21 +293,27 @@ async function writeOnce() {
 }
 
 // ── LOAD FROM FIRESTORE ───────────────────────────────────────
+// Returns false when the cloud couldn't be read and there is no real local
+// save to fall back on; the caller must not start the session in that case.
 async function loadStateFromFirestore() {
-  if (inDemoMode()) return;
-  if (!currentUser) return;
+  if (inDemoMode()) return false;
+  if (!currentUser) return false;
   cloudCache = { meta: null, root: null, months: {}, notes: null, legacy: false };
   try {
     const cloud = await readCloud();
-    if (inDemoMode()) return;
+    if (inDemoMode()) return false;
     const localTasks = (appState?.days || []).reduce((n, d) => n + (d.tasks?.length || 0), 0);
     if (!cloud && localTasks === 0) generateNewState();
     reconcileWithCloud(cloud);
+    localStateIsPlaceholder = false;
     setSyncStatus("synced");
+    return true;
   } catch (e) {
     console.error("Firebase load error:", e);
     setSyncStatus(isOfflineError(e) ? "offline" : "error");
+    if (localStateIsPlaceholder) return false;
     showAuthToast("Cloud load failed. Using local save.", "error");
+    return true;
   }
 }
 
@@ -308,7 +346,16 @@ async function pullIfRemoteChanged() {
 window.pullIfRemoteChanged = pullIfRemoteChanged;
 
 if (typeof window.addEventListener === "function") {
-  window.addEventListener("online", () => { pullIfRemoteChanged(); });
+  window.addEventListener("online", () => {
+    // A load that failed offline retries right away instead of waiting out its backoff.
+    if (currentUser && !stateReady && !inDemoMode()) {
+      clearTimeout(loadRetryTimer);
+      loadRetryDelay = LOAD_RETRY_MIN_MS;
+      startSession(currentUser);
+      return;
+    }
+    pullIfRemoteChanged();
+  });
   window.addEventListener("offline", () => { if (currentUser) setSyncStatus("offline"); });
   window.addEventListener("focus", () => { pullIfRemoteChanged(); });
 }

@@ -213,7 +213,15 @@
   }
 
   window.authGate = {
-    cancelSignOut: function () { explicitSignOut = false; }
+    cancelSignOut: function () { explicitSignOut = false; },
+    // Signed in, but the cloud copy hasn't loaded yet: stay on the spinner and
+    // say why. firebase-sync.js keeps retrying and unlocks on success.
+    showLoadError: function (msg) {
+      if (resolved) return;
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+      setState("checking");
+      showError(msg);
+    }
   };
 
   if (document.readyState === "loading") {
